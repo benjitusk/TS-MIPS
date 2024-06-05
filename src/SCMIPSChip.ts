@@ -1,6 +1,7 @@
 import _ from 'lodash';
 import { Assembler } from './utils/assembler';
 import { RAW_MIPS_REGISTER } from './language/MIPS';
+import { Memory } from './components/memory';
 
 class SingleCycleMIPSChip {
     /** Stores the values of the general-purpose registers */

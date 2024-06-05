@@ -1,7 +1,7 @@
 /// Author: Benji Tusk
 /// Description: MEMORY component for a MIPS processor
 
-class Memory {
+export class Memory {
     /** The amount of bytes allocated for a single instance of Memory */
     private MEMORY_SIZE: number;
 
@@ -104,5 +104,12 @@ class Memory {
         this.memory.fill(0);
         // Clear the listeners
         this.listeners.clear();
+    }
+
+    /**
+     * Prints the contents of memory to the console.
+     */
+    public dump(): void {
+        throw new Error('Not implemented.');
     }
 }
