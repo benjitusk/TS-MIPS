@@ -1,3 +1,5 @@
+import { Assembler } from '../utils/assembler';
+
 export const MIPS_ASSEMBLER_DIRECTIVES = {
     '.align': {
         description: 'Align the next data on a word boundary',
@@ -106,8 +108,30 @@ export const MIPS_ASSEMBLER_DIRECTIVES = {
     },
 } as const;
 
-type MIPSAssemblerDirective = keyof typeof MIPS_ASSEMBLER_DIRECTIVES;
+export type MIPSAssemblerDirective = keyof typeof MIPS_ASSEMBLER_DIRECTIVES;
 
 export function isMIPSAssemblerDirective(directive: string): directive is MIPSAssemblerDirective {
     return MIPS_ASSEMBLER_DIRECTIVES[directive as MIPSAssemblerDirective] !== undefined;
+}
+
+export class AssemblerDirective {
+    args: string[];
+    assembler: Assembler;
+    directive: MIPSAssemblerDirective;
+    constructor(assembler: Assembler, directive: MIPSAssemblerDirective, args: string[]) {
+        this.args = args;
+        this.assembler = assembler;
+        this.directive = directive;
+    }
+
+    execute(locationCounter: number) {
+        // See https://github.com/microsoft/TypeScript/issues/19335 for accessing private properties of a class
+        const dataToWrite = new Uint8Array();
+        console.warn(`Assembler Directive ${this.directive} not implemented, writing empty data!`);
+        this.assembler['memory'].write(locationCounter, dataToWrite);
+    }
+
+    calculateForwardOffset(): number {
+        return 0;
+    }
 }
