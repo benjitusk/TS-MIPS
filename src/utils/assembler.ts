@@ -3,8 +3,9 @@
 
 import _, { trim } from 'lodash';
 import { isMIPSInstruction, MIPS_CORE_INSTRUCTIONS, MIPS_OP } from '../language/MIPS';
-import { isMIPSAssemblerDirective, MIPS_ASSEMBLER_DIRECTIVES } from '../language/ASMDirectives';
+import { AssemblerDirective, isMIPSAssemblerDirective, MIPS_ASSEMBLER_DIRECTIVES } from '../language/ASMDirectives';
 import * as MIPSErrors from './Errors';
+import { Memory } from '../components/memory';
 
 /**
  * Assembler
@@ -23,7 +24,14 @@ export class Assembler {
         this.memory = memory_ref;
     }
 
+    /** A reference to the MIPS chip's memory component */
     private memory: Memory;
+
+    /** A symbol table for tracking the labels and addresses */
+    private symbolTable = {
+        '.text': 0x00400000,
+        '.data': 0x10010000,
+    } as { [label: string]: number };
 
     /**
      * Compiles the given source code into machine code.
@@ -32,14 +40,15 @@ export class Assembler {
      * @returns The machine code generated from the source code
      */
     private compile(source: string): Uint32Array {
-        // Parse the source code
+        // Parse the source code (Lexical analysis and parsing)
         const instructions = this.parse(source);
 
-        // Validate the source code and sort it by type
-        const { MIPS, asmDirectives } = this.validate(instructions);
+        // Expand pseudo instructions to full form
 
-        // Execute assembler directives
-        this.executeDirectives(asmDirectives);
+        // Symbol Table Generation
+        this.buildSymbolTable(instructions);
+
+        const { MIPS, asmDirectives } = this.validate(instructions);
 
         // Assemble the source code
         return this.assembleInstructions(instructions);
@@ -109,27 +118,38 @@ export class Assembler {
         return instructions;
     }
 
-    /**
-     * Processes the assembler directives in the given instructions.
-     * Assembler directives are special instructions that are not executed
-     * by the processor, but are used to control the assembler.
-     *
-     * @param instructions The instructions to be processed
-     * @returns The instructions with the assembler directives removed
-     *
-     * @throws An error if an invalid directive is found
-     * @throws An error if an invalid label is found
-     */
-    private executeDirectives(instructions: string[]): void {
-        for (let directive of instructions) {
-            // Remove the leading .
-            directive = directive.substring(1);
+    private buildSymbolTable(instructions: string[]): void {
+        // Start at the beginning of where the program will be stored
+        let segment: '.text' | '.data' = '.text';
+        const locationCounter = {
+            '.text': this.symbolTable['.text'],
+            '.data': this.symbolTable['.data'],
+        };
+        const linesToStrip: number[] = [];
+        for (const [index, line] of instructions.entries()) {
+            const [command, ...args] = line.split(' ');
+            // Check if the line is a directive to change data segments
+            if (isMIPSAssemblerDirective(command)) {
+                // Mark this line for removal after building the symbol table
+                linesToStrip.push(index);
+                if (line === '.text' || line === '.data') {
+                    segment = line;
+                }
+                const directive = new AssemblerDirective(this, command, args);
 
-            // Get the actual instruction
-            const instruction = directive.split(' ');
+                // Execute the directive, specifying where our pointer is now
+                directive.execute(locationCounter[segment]);
 
-            // TODO: Implement Assembler Directives
-            console.warn(`ASM_DIRECTIVE ${instruction} NOT IMPLEMENTED`);
+                // Calculate the forward offset
+                const forwardOffset = directive.calculateForwardOffset();
+
+                locationCounter[segment] += forwardOffset;
+            } else {
+                // It's a standard 4 byte MIPS instruction
+                locationCounter[segment] += 0x0004;
+            }
+
+            // TODO: Remove all the preprocessor directives
         }
     }
 
@@ -179,6 +199,11 @@ export class Assembler {
      * @returns The machine code generated from the instructions
      */
     private assembleInstructions(instructions: string[]): Uint32Array {
+        // At this stage, each line should be a single valid MIPS instruction
+
+        // TODO: First step is replace all labels with their offset value
+        // TODO: Then create a binary representation of the instruction, registers, and immediate values
+        // TODO: Then zero-extend it to 32 bits (one word) and append it to the result
         throw 'NOT IMPLEMENTED';
     }
 }
