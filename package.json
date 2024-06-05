@@ -1,17 +1,22 @@
 {
-	"name": "tsmips",
-	"version": "1.0.0",
-	"main": "dist/index.js",
-	"scripts": {
-		"start": "node --loader ts-node/esm src/index.ts",
-		"test": "echo \"Error: no test specified\" && exit 1"
-	},
-	"keywords": [],
-	"author": "",
-	"license": "ISC",
-	"description": "",
-	"devDependencies": {
-		"ts-node": "^10.9.2",
-		"typescript": "^5.4.5"
-	}
+    "name": "tsmips",
+    "version": "1.0.0",
+    "main": "dist/index.js",
+    "scripts": {
+        "test": "echo \"Error: no test specified\" && exit 1",
+        "build": "tsc",
+        "start": "ts-node src/index.ts"
+    },
+    "keywords": [],
+    "author": "",
+    "license": "ISC",
+    "description": "",
+    "devDependencies": {
+        "@types/lodash": "^4.17.4",
+        "ts-node": "^10.9.2",
+        "typescript": "^5.4.5"
+    },
+    "dependencies": {
+        "lodash": "^4.17.21"
+    }
 }
