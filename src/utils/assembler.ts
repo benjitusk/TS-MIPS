@@ -223,6 +223,7 @@ export class Assembler {
                 case 'slt':
                 case 'sltu':
                 case 'sll':
+                case 'srl':
                 case 'sub':
                 case 'subu':
                     // 0xOOOOOODDDDDTTTTTSSSSSHHHHHFFFFFF
@@ -258,6 +259,11 @@ export class Assembler {
                     rawInstruction |= rt << (21 - 5);
                     rawInstruction |= immediate << (16 - 16);
                     break;
+                case 'j':
+                case 'jal':
+                    rawInstruction |= immediate << (26 - 26);
+                default:
+                    throw new MIPSErrors.MIPSAssemblerError('Unknown Instruction: `' + instruction + '`');
             }
             const instructionBuffer = new Uint32Array([rawInstruction]);
             machineCode.set(instructionBuffer, bufferPointer);
