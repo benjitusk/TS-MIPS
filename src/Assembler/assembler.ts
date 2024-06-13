@@ -598,9 +598,6 @@ export class Assembler {
             bufferPointer += 1;
         }
 
-        // TODO: First step is replace all labels with their offset value
-        // TODO: Then create a binary representation of the instruction, registers, and immediate values
-        // TODO: Then zero-extend it to 32 bits (one word) and append it to the result
         return machineCode;
     }
 }
