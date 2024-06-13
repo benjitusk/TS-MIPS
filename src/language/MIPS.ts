@@ -203,7 +203,6 @@ export const MIPS_CORE_INSTRUCTIONS = {
             if (args.length !== 3) throw new Error('sb requires 3 arguments (rt, offset, base)');
         },
     },
-
     sc: {
         type: 'I',
         opCode: 0x38,
@@ -255,7 +254,6 @@ export const MIPS_CORE_INSTRUCTIONS = {
             if (args.length !== 3) throw new Error('sltu requires 3 arguments (rd, rs, rt)');
         },
     },
-
     sll: {
         type: 'R',
         opCode: 0,
@@ -310,26 +308,6 @@ export const MIPS_CORE_INSTRUCTIONS = {
         shftAmt?: number;
     };
 };
-
-export function validateInstruction(instruction: MIPS_OP, args: string[]): void {
-    // Check what type the instruction is
-    const type = MIPS_CORE_INSTRUCTIONS[instruction].type;
-
-    switch (type) {
-        case 'R':
-            // The syntax for R-type instructions is: op rd, rs, rt
-            if (args.length !== 3) throw 'Invalid number of arguments';
-            break;
-        case 'I':
-            // Check if the number of arguments is correct
-            if (args.length !== 3) throw 'Invalid number of arguments';
-            break;
-        case 'J':
-            // Check if the number of arguments is correct
-            if (args.length !== 1) throw 'Invalid number of arguments';
-            break;
-    }
-}
 
 export type MIPS_OP = (typeof MIPS_CORE_INSTRUCTION_SET)[number];
 

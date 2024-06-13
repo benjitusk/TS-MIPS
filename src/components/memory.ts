@@ -88,7 +88,7 @@ export class Memory {
      */
     public write(address: number, data: Uint8Array): void {
         // Check if the address is within the bounds of the memory
-        this.validateAddress(address, length);
+        this.validateAddress(address, data.byteLength);
 
         // Write the data to the memory
         this.memory.set(data, address);
