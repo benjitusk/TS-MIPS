@@ -106,17 +106,20 @@ export class Assembler {
 
         // Clean up each instruction
         instructions = _(instructions)
-            .map((line) => line.split(';')[0]) // Strip out comments
-            .filter((line) => !_.isEmpty(line)) // Remove empty lines
-            .map(
-                (line) =>
-                    line
-                        .split(/\s+/) // Split on whitespace //TODO: This is technically incorrect syntax format, but we'll temporarily allow it
-                        .map(trim) // Make sure there is no extra spacing
-                        .filter((line) => !_.isEmpty(line.trim())) // Strip any blank entries
-                        .join(' ') // Stitch the sanitized line back together
-            )
+            .map((line) => line.split('#')[0]) // Strip out comments
+            .filter((line) => !_.isEmpty(line.trim())) // Remove empty lines
+            .map((line) => {
+                const parts = line.trim().split(/\s+/); // Split by whitespace
+                const op = parts.shift(); // Extract the operation
+                const params = parts
+                    .join(' ')
+                    .split(',')
+                    .map(trim)
+                    .filter((part) => !_.isEmpty(part)); // Process parameters
+                return [op, ...params].join(' '); // Join operation and parameters with space
+            })
             .value();
+
         return instructions as MIPSInstruction[];
     }
 
