@@ -89,8 +89,6 @@ class SingleCycleMIPSChip {
         // Print the opcode
         console.log([...new Uint8Array(opCode)].map((x) => x.toString(16).padStart(2, '0')).join(''));
     }
-
-    private executeInstruction(instruction: string) {}
 }
 
 export default SingleCycleMIPSChip;

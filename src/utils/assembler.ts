@@ -196,6 +196,46 @@ export class Assembler {
         const machineCode = new Uint32Array(instructions.length);
         let bufferPointer = 0;
         // At this stage, each line should be a single valid MIPS instruction
+        for (const instruction of instructions) {
+            const op = instruction.split(' ')[0] as MIPS_OP;
+            const [, ...args] = instruction.split(' ');
+            let rawInstruction = 0x00000000000000000000000000000000;
+            const instructionDetails = MIPS_CORE_INSTRUCTIONS[op];
+            // Get the 6 bit opcode
+            const opCode = instructionDetails.opCode;
+            rawInstruction |= opCode << (32 - 6);
+            switch (op) {
+                // All R type commands of format `op $rs $rt $rd`
+                case 'add':
+                case 'addu':
+                case 'and':
+                case 'nor':
+                case 'or':
+                case 'slt':
+                case 'sltu':
+                case 'sll':
+                case 'sub':
+                case 'subu':
+                    // 0xOOOOOOSSSSSTTTTTDDDDDHHHHHFFFFFF
+                    // Get the registers
+                    let [rs, rt, rd] = args
+                        .filter(isValidRegister)
+                        .map(registerLookup)
+                        .map((reg) => reg.registerNumber);
+                    // TODO: Add shftAmt to instruction details
+                    const shftAmt = instructionDetails.shftAmt ?? 0;
+                    const funct = instructionDetails.funct ?? 0;
+
+                    rawInstruction |= rs << (26 - 5);
+                    rawInstruction |= rt << (21 - 5);
+                    rawInstruction |= rd << (15 - 5);
+                    rawInstruction |= shftAmt << (10 - 5);
+                    rawInstruction |= funct << (5 - 5);
+                    break;
+            }
+            const instructionBuffer = new Uint32Array([rawInstruction]);
+            machineCode.set(instructionBuffer, bufferPointer);
+        }
 
         // TODO: First step is replace all labels with their offset value
         // TODO: Then create a binary representation of the instruction, registers, and immediate values

@@ -306,6 +306,8 @@ export const MIPS_CORE_INSTRUCTIONS = {
         opCode: number;
         description: string;
         validate: (args: string[]) => void;
+        funct?: number;
+        shftAmt?: number;
     };
 };
 
@@ -539,14 +541,21 @@ const MIPS_REGISTERS = {
     [key in RAW_MIPS_REGISTER]: {
         alias: string;
         description: string;
+        registerNumber: number;
     };
 };
 
-function isValidRegister(register: string): register is MIPS_REGISTER {
+export function isValidRegister(register: string): register is MIPS_REGISTER {
     return (
         // It could be a raw register ($17, for example)
         MIPS_REGISTERS[register as RAW_MIPS_REGISTER] !== undefined ||
         // Or a register alias ($s1, for example)
         MIPS_REGISTERS[REGISTER_UNALIAS[register as ALIAS_MIPS_REGISTER]] !== undefined
+    );
+}
+
+export function registerLookup(regKey: MIPS_REGISTER): (typeof MIPS_REGISTERS)[RAW_MIPS_REGISTER] {
+    return (
+        MIPS_REGISTERS[regKey as RAW_MIPS_REGISTER] ?? MIPS_REGISTERS[REGISTER_UNALIAS[regKey as ALIAS_MIPS_REGISTER]]
     );
 }
