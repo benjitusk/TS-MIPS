@@ -17,6 +17,7 @@
         "typescript": "^5.4.5"
     },
     "dependencies": {
-        "lodash": "^4.17.21"
+        "lodash": "^4.17.21",
+        "type-fest": "^4.20.0"
     }
 }
