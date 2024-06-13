@@ -57,28 +57,15 @@ export class Memory {
         if (this.listeners.has(address)) for (const listener of this.listeners.get(address) ?? []) listener(data);
     }
 
-    /**
-     * Reads bytes from the memory at the given address.
-     *
-     * @param address The address to read from
-     * @param length The number of bytes to read, defaults 4 (one word)
-     * @returns The byte read from the memory
-     */
-    private read(address: number, length: number): Uint8Array {
-        // Check if the address is within the bounds of the memory
-        this.validateAddress(address, length);
-
-        // Read the byte from the memory
-        return this.memory.slice(address, address + length);
+    public readByte(address: number) {
+        const view = new DataView(this.memory.buffer);
+        return view.getUint8(address);
     }
 
-    public readByte(address: number): Uint8Array {
-        return this.read(address, 1);
-    }
-
-    public readWord(address: number): Uint32Array {
+    public readWord(address: number) {
         // TODO: Make sure we're reading on a word boundary
-        return Uint32Array.from(this.read(address, 4));
+        const view = new DataView(this.memory.buffer);
+        return view.getUint32(address, false);
     }
     /**
      * Writes bytes to the memory at the given address.
@@ -91,7 +78,8 @@ export class Memory {
         this.validateAddress(address, data.byteLength);
 
         // Write the data to the memory
-        this.memory.set(data, address);
+        const view = new DataView(this.memory.buffer);
+        for (let i = 0; i < data.byteLength; i++) view.setUint8(address + i, data[i]);
 
         // Notify the memory listeners
         this.notifyListeners(address, data);
