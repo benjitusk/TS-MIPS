@@ -2,10 +2,12 @@
 /// Description: Assembler class for assembling source code into machine code
 
 import _, { trim } from 'lodash';
-import { isMIPSInstruction, MIPS_CORE_INSTRUCTIONS, MIPS_OP } from '../language/MIPS';
+import { isMIPSInstruction, isValidRegister, MIPS_CORE_INSTRUCTIONS, MIPS_OP, registerLookup } from '../language/MIPS';
 import { AssemblerDirective, isMIPSAssemblerDirective, MIPS_ASSEMBLER_DIRECTIVES } from '../language/ASMDirectives';
 import * as MIPSErrors from './Errors';
 import { Memory } from '../components/memory';
+
+type MIPSInstruction = string;
 
 /**
  * Assembler
@@ -43,14 +45,14 @@ export class Assembler {
         // Parse the source code (Lexical analysis and parsing)
         const instructions = this.parse(source);
 
-        // Expand pseudo instructions to full form
+        // Validate the instructions (Syntax analysis, pseudo instruction expansion)
+        // List of pseudo instructions: https://en.wikibooks.org/wiki/MIPS_Assembly/Pseudoinstructions
+        this.validate(instructions);
 
-        // Symbol Table Generation
+        // First Pass: Symbol Table Generation
         this.buildSymbolTable(instructions);
 
-        const { MIPS, asmDirectives } = this.validate(instructions);
-
-        // Assemble the source code
+        // Second Pass: Translate instructions to machine code
         return this.assembleInstructions(instructions);
     }
 
@@ -95,7 +97,7 @@ export class Assembler {
      * @param source The source code to be parsed
      * @returns The instructions parsed from the source code
      */
-    private parse(source: string): string[] {
+    private parse(source: string): MIPSInstruction[] {
         // Clean up whitespace
         source = source.trim();
 
@@ -115,10 +117,10 @@ export class Assembler {
                         .join(' ') // Stitch the sanitized line back together
             )
             .value();
-        return instructions;
+        return instructions as MIPSInstruction[];
     }
 
-    private buildSymbolTable(instructions: string[]): void {
+    private buildSymbolTable(instructions: MIPSInstruction[]): MIPSInstruction[] {
         // Start at the beginning of where the program will be stored
         let segment: '.text' | '.data' = '.text';
         const locationCounter = {
@@ -135,22 +137,27 @@ export class Assembler {
                 if (line === '.text' || line === '.data') {
                     segment = line;
                 }
-                const directive = new AssemblerDirective(this, command, args);
 
-                // Execute the directive, specifying where our pointer is now
-                directive.execute(locationCounter[segment]);
+                // Build the directive
+                const directive = new AssemblerDirective(this, command, args, locationCounter[segment]);
+
+                // Execute the directive
+                directive.execute();
 
                 // Calculate the forward offset
                 const forwardOffset = directive.calculateForwardOffset();
 
+                // Update the location counter
                 locationCounter[segment] += forwardOffset;
             } else {
                 // It's a standard 4 byte MIPS instruction
                 locationCounter[segment] += 0x0004;
             }
-
-            // TODO: Remove all the preprocessor directives
         }
+        for (const index of linesToStrip) {
+            instructions.splice(index, 1);
+        }
+        return instructions;
     }
 
     /**
@@ -160,12 +167,7 @@ export class Assembler {
      *
      * @throws An error if the instructions are invalid
      */
-    private validate(instructions: string[]) {
-        const categoriezedInstructions = {
-            MIPS: [],
-            asmDirectives: [],
-        } as { MIPS: MIPS_OP[]; asmDirectives: string[] };
-
+    private validate(instructions: MIPSInstruction[]) {
         for (const [index, instruction] of instructions.entries()) {
             const [word, ...args] = instruction.split(' ');
             if (isMIPSAssemblerDirective(word)) {
@@ -174,7 +176,6 @@ export class Assembler {
                 } catch (e) {
                     throw new MIPSErrors.MIPSAssemblerDirectiveSyntaxError(word, index);
                 }
-                categoriezedInstructions.asmDirectives.push(instruction);
             } else if (isMIPSInstruction(word))
                 try {
                     MIPS_CORE_INSTRUCTIONS[word].validate(args);
@@ -183,13 +184,6 @@ export class Assembler {
                 }
             else throw new MIPSErrors.MIPSAssemblerSyntaxError(instruction, index);
         }
-        // Make sure each MIPS instruction exists
-        for (const instruction of categoriezedInstructions.MIPS) {
-            if (isMIPSInstruction(instruction)) {
-                throw `Invalid instruction: ${instruction}`;
-            }
-        }
-        return categoriezedInstructions;
     }
 
     /**
@@ -198,12 +192,14 @@ export class Assembler {
      * @param instructions The instructions to be assembled
      * @returns The machine code generated from the instructions
      */
-    private assembleInstructions(instructions: string[]): Uint32Array {
+    private assembleInstructions(instructions: MIPSInstruction[]): Uint32Array {
+        const machineCode = new Uint32Array(instructions.length);
+        let bufferPointer = 0;
         // At this stage, each line should be a single valid MIPS instruction
 
         // TODO: First step is replace all labels with their offset value
         // TODO: Then create a binary representation of the instruction, registers, and immediate values
         // TODO: Then zero-extend it to 32 bits (one word) and append it to the result
-        throw 'NOT IMPLEMENTED';
+        return machineCode;
     }
 }

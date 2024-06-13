@@ -114,24 +114,73 @@ export function isMIPSAssemblerDirective(directive: string): directive is MIPSAs
     return MIPS_ASSEMBLER_DIRECTIVES[directive as MIPSAssemblerDirective] !== undefined;
 }
 
+/**
+ * Represents an assembler directive in the MIPS assembly language.
+ */
 export class AssemblerDirective {
     args: string[];
     assembler: Assembler;
     directive: MIPSAssemblerDirective;
-    constructor(assembler: Assembler, directive: MIPSAssemblerDirective, args: string[]) {
+    locationCounter: number;
+
+    /**
+     * Creates a new instance of the AssemblerDirective class.
+     * @param assembler The assembler instance.
+     * @param directive The MIPS assembler directive.
+     * @param args The arguments for the directive.
+     * @param locationCounter The current location counter.
+     */
+    constructor(assembler: Assembler, directive: MIPSAssemblerDirective, args: string[], locationCounter: number) {
         this.args = args;
         this.assembler = assembler;
         this.directive = directive;
+        this.locationCounter = locationCounter;
     }
 
-    execute(locationCounter: number) {
+    /**
+     * Executes the assembler directive.
+     * @param locationCounter The current location counter.
+     */
+    execute() {
         // See https://github.com/microsoft/TypeScript/issues/19335 for accessing private properties of a class
-        const dataToWrite = new Uint8Array();
-        console.warn(`Assembler Directive ${this.directive} not implemented, writing empty data!`);
-        this.assembler['memory'].write(locationCounter, dataToWrite);
+
+        switch (this.directive) {
+        }
     }
 
+    /**
+     * Calculates the forward offset for the assembler directive.
+     * @returns The forward offset.
+     */
     calculateForwardOffset(): number {
-        return 0;
+        switch (this.directive) {
+            case '.align':
+                // Depending on the current location counter, we may need to align to the next word boundary
+                const alignment = parseInt(this.args[0]);
+                const remainder = alignment - (this.locationCounter % alignment);
+                return remainder === alignment ? 0 : remainder;
+            case '.ascii':
+                return this.args[0].length;
+            case '.asciiz':
+                return this.args[0].length + 1;
+            case '.byte':
+                return this.args.length;
+            case '.data':
+                return 0;
+            case '.double':
+                return this.args.length * 8;
+            case '.float':
+                return this.args.length * 4;
+            case '.half':
+                return this.args.length * 2;
+            case '.space':
+                return parseInt(this.args[0]);
+            case '.text':
+                return 0;
+            case '.word':
+                return this.args.length * 4;
+            default:
+                throw new Error(`Unknown directive: ${this.directive}`);
+        }
     }
 }
