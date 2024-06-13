@@ -111,9 +111,9 @@ export class Assembler {
             .map(
                 (line) =>
                     line
-                        .split(' ') // For each word
+                        .split(/\s+/) // Split on whitespace //TODO: This is technically incorrect syntax format, but we'll temporarily allow it
                         .map(trim) // Make sure there is no extra spacing
-                        .filter((line) => !_.isEmpty(line)) // Strip any blank entries
+                        .filter((line) => !_.isEmpty(line.trim())) // Strip any blank entries
                         .join(' ') // Stitch the sanitized line back together
             )
             .value();
@@ -204,11 +204,20 @@ export class Assembler {
             // Get the 6 bit opcode
             const opCode = instructionDetails.opCode;
             rawInstruction |= opCode << (32 - 6);
+            const [rd, rs, rt] = args
+                .map((reg) => reg ?? '$0') // If there's no register passed in for that argument (i.e., the jr command), use the $0 register b/c it translates to 000000
+                .filter(isValidRegister)
+                .map(registerLookup)
+                .map((reg) => reg.registerNumber);
+            let immediate = 0;
+            immediate = parseInt(args[2]);
+
             switch (op) {
-                // All R type commands of format `op $rs $rt $rd`
+                // All R type commands of format `op $rd $rt $rs`
                 case 'add':
                 case 'addu':
                 case 'and':
+                case 'jr':
                 case 'nor':
                 case 'or':
                 case 'slt':
@@ -216,21 +225,38 @@ export class Assembler {
                 case 'sll':
                 case 'sub':
                 case 'subu':
-                    // 0xOOOOOOSSSSSTTTTTDDDDDHHHHHFFFFFF
+                    // 0xOOOOOODDDDDTTTTTSSSSSHHHHHFFFFFF
                     // Get the registers
-                    let [rs, rt, rd] = args
-                        .filter(isValidRegister)
-                        .map(registerLookup)
-                        .map((reg) => reg.registerNumber);
                     // TODO: Add shftAmt to instruction details
                     const shftAmt = instructionDetails.shftAmt ?? 0;
                     const funct = instructionDetails.funct ?? 0;
 
                     rawInstruction |= rs << (26 - 5);
                     rawInstruction |= rt << (21 - 5);
-                    rawInstruction |= rd << (15 - 5);
-                    rawInstruction |= shftAmt << (10 - 5);
-                    rawInstruction |= funct << (5 - 5);
+                    rawInstruction |= rd << (16 - 5);
+                    rawInstruction |= shftAmt << (11 - 5);
+                    rawInstruction |= funct << (6 - 6);
+                    break;
+                case 'addi':
+                case 'addiu':
+                case 'andi':
+                case 'beq':
+                case 'bne':
+                case 'lbu':
+                case 'lhu':
+                case 'll':
+                case 'lui':
+                case 'lw':
+                case 'ori':
+                case 'sb':
+                case 'sc':
+                case 'sh':
+                case 'slti':
+                case 'sltiu':
+                case 'sw':
+                    rawInstruction |= rs << (26 - 5);
+                    rawInstruction |= rt << (21 - 5);
+                    rawInstruction |= immediate << (16 - 16);
                     break;
             }
             const instructionBuffer = new Uint32Array([rawInstruction]);
