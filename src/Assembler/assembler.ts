@@ -11,12 +11,8 @@ import {
     registerLookup,
     unaliasRegister,
 } from '../language/MIPS';
-import {
-    AssemblerDirective,
-    isMIPSAssemblerDirective,
-    isMIPSPseudoInstruction,
-    MIPS_ASSEMBLER_DIRECTIVES,
-} from '../language/ASMDirectives';
+import { AssemblerDirective, isMIPSAssemblerDirective, MIPS_ASSEMBLER_DIRECTIVES } from '../language/ASMDirectives';
+import { isMIPSPseudoInstruction } from '../language/MIPS';
 import * as MIPSErrors from '../utils/Errors';
 import { Memory } from '../components/memory';
 import { Tokenizer } from './tokenizer';
