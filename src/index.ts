@@ -2,13 +2,18 @@ import SingleCycleMIPSChip from './SCMIPSChip';
 
 // This MIPS program calculates the sum of the first 10 positive integers
 const program = `
-    addi $t0, $zero, 0;     Initialize the sum to 0
-    addi $t1, $zero, 1;     Initialize the counter to 1
-    addi $t2, $zero, 10;    Set the limit to 10
-loop:
-    add $t0, $t0, $t1;      Add the counter to the sum
-    addi $t1, $t1, 1;       Increment the counter
-    bne $t1, $t2, loop;     Repeat if the counter is less than the limit
+main:          lw $t0, top($0)                  ;0x00
+               .word beyond                     ;0x04
+               jr $1                            ;0x08
+               .word 2                          ;0x0c
+               ; Hello, I'm a comment;
+               add $3, $0, $0                   ;0x10
+top: begin: ; Two labels on the same line;
+               add $3, $3, $2                   ;0x14
+               sub $2, $2, $1                   ;0x18
+               bne $2, $0, top ; Go to top      ;0x1c
+               jr $31                           ;0x20
+beyond: ; Label after last instruction;
 `;
 
 const mipsChip = new SingleCycleMIPSChip();
