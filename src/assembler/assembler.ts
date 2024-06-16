@@ -45,7 +45,7 @@ export class Assembler {
     /** A symbol table for tracking the labels and addresses */
     private symbolTable = {
         '.text': 0x00000000, // Start of the text segment is at address 0
-        '.data': 0x00000100, // Start of the data segment is at address 65536 (64KiB)
+        '.data': 0x00000800, // Start of the data segment is at address 65536 (64KiB)
     } as { [label: string]: number };
 
     /**
@@ -60,12 +60,12 @@ export class Assembler {
 
         // First Pass: Symbol Table Generation, Pseudo Instruction Expansion, and Syntax Analysis
         // List of pseudo instructions: https://en.wikibooks.org/wiki/MIPS_Assembly/Pseudoinstructions
-        this.expandPseudoInstructions();
         this.validate();
         this.buildSymbolTable();
 
         // Second Pass: Symbol Resolution
-        // Replace all labels with their offsets,
+        // Expand all pseudo instructions,
+        // replace all labels with their offsets,
         // and execute directives to allocate memory
         const resolvedInstructions = this.resolveSymbols();
 
@@ -210,21 +210,36 @@ export class Assembler {
                     const source = resolvedArgTokens.find((arg) => arg.type === 'register')!.value;
 
                     // Replace the memory reference with the expanded instruction
-                    expandedInstruction = `${command} ${source} ${memoryReference.base} ${memoryReference.offset}`;
+                    memoryExpandedInstruction = `${command} ${source} ${memoryReference.base} ${memoryReference.offset}`;
                 }
 
                 // Replace the instruction
-                instructions[index] = expandedInstruction;
+                resolvedInstructions[index] = memoryExpandedInstruction;
 
                 // Increment the location counter
                 locationCounter[segment] += 4;
             }
         }
 
-        // Remove all labels from the instructions
-        instructions = instructions.filter((_, index) => !linesToStrip.includes(index));
+        // Clean up the instructions
+        // Remove all lines that were marked for removal
+        // This includes all labels and assembler directives
+        // that were executed in the previous step.
+        // We also remove any empty lines.
+        resolvedInstructions = resolvedInstructions.filter((_, index) => !linesToStrip.includes(index));
 
-        return instructions;
+        // Stage 3: Expand Pseudo Instructions
+        // Now that the labels were replaced with constants,
+        // we can actually split up instructions.
+        const expandedInstructions: MIPSInstruction[] = [];
+        for (const instruction of resolvedInstructions) {
+            const expanded = this.expand(instruction, 0);
+            console.log(`${instruction} -> ${expanded}`);
+            expandedInstructions.push(...expanded);
+        }
+
+        // Remove all labels from the instructions
+        return expandedInstructions;
     }
 
     // MARK: - Pseudo Expansion
@@ -356,10 +371,8 @@ export class Assembler {
                     .filter((part) => !_.isEmpty(part)); // Process parameters
                 return [op, ...params].join(' '); // Join operation and parameters with space
             })
+            .map(convertCharLiterals) // Convert character literals to ASCII values
             .value();
-
-        // Make sure labels are on their own line
-        instructions;
 
         return instructions as MIPSInstruction[];
     }
@@ -634,7 +647,7 @@ export class Assembler {
                 case 'nop':
                     // 0x00000000000000000000000000000000  (nop)
                     break;
-                
+
                 // MARK: Non-Core
                 case 'syscall':
                 case 'break':
@@ -655,4 +668,33 @@ export class Assembler {
 
         return machineCode;
     }
+}
+
+function convertCharLiterals(instruction) {
+    return instruction.replace(/'((?:\\.|[^\\'])+)'/g, (match, char) => {
+        if (char.length === 1) {
+            return char.charCodeAt(0);
+        } else if (char.length === 2 && char[0] === '\\') {
+            switch (char[1]) {
+                case 'n':
+                    return 10;
+                case 'r':
+                    return 13;
+                case 't':
+                    return 9;
+                case '\\':
+                    return 92;
+                case "'":
+                    return 39;
+                case '"':
+                    return 34;
+                case '0':
+                    return 0;
+                default:
+                    throw new Error(`Invalid escape sequence: \\${char[1]}`);
+            }
+        } else {
+            throw new Error(`Invalid character literal: ${match}`);
+        }
+    });
 }
