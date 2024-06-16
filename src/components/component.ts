@@ -4,6 +4,8 @@
 
 import { RAW_MIPS_REGISTER } from '../language/MIPS';
 type bit = 0 | 1;
+type byte = [bit, bit, bit, bit, bit, bit, bit, bit];
+type word = [...byte, ...byte, ...byte, ...byte];
 
 abstract class Component {
     abstract tick(): void;
@@ -66,7 +68,7 @@ export class RegisterFile extends Component {
     /**
      * The input at Write Data. (32-bit)
      */
-    public writeData: number = 0;
+    public writeData: word = new Array(32).fill(0) as word;
 
     /**
      * The input at Write Enable.
@@ -76,12 +78,12 @@ export class RegisterFile extends Component {
     /**
      * The output at Read Data 1.
      */
-    public readData1: number = 0;
+    public readData1: word = new Array(32).fill(0) as word;
 
     /**
      * The output at Read Data 2.
      */
-    public readData2: number = 0;
+    public readData2: word = new Array(32).fill(0) as word;
 
     /**
      * Execute a clock cycle.

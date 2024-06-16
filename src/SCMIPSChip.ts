@@ -56,7 +56,34 @@ class SingleCycleMIPSChip {
         const instruction = this.memory.readWord(this.PC);
 
         // Decode the instruction we just loaded.
+        // The opcode is the top 6 bits of the instruction
         const opCode = instruction >>> 26;
+        // The rest of the instruction is split into different fields
+
+        // R-Type / I-Type
+        // 5 bits for rs (source register)
+        const rs = (instruction >>> 21) & 0x1f;
+        // 5 bits for rt (target register)
+        const rt = (instruction >>> 16) & 0x1f;
+        // 5 bits for rd (destination register)
+        const rd = (instruction >>> 11) & 0x1f;
+
+        // R-Type only
+        // 5 bits for shamt (shift amount)
+        const shamt = (instruction >>> 6) & 0x1f;
+        // 6 bits for funct (function)
+        const funct = instruction & 0x3f;
+
+        // I-Type only
+        // 16 bits for immediate value
+        const imm = instruction & 0xffff;
+
+        // J-Type only
+        // 26 bits for jump address
+        const addr = instruction & 0x3ffffff;
+
+        // Split it into an array of bits
+        const opBits = numberToBitString(opCode, 6);
 
         // Print the opcode
         console.log(`Opcode: 0x${opCode.toString(16)}`);
@@ -64,3 +91,7 @@ class SingleCycleMIPSChip {
 }
 
 export default SingleCycleMIPSChip;
+
+function numberToBitString(n: number, length: number): number[] {
+    return _.padStart(n.toString(2), length, '0').split('').map(Number);
+}
