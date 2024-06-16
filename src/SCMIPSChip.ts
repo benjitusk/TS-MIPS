@@ -1,56 +1,28 @@
 import _ from 'lodash';
 import { Assembler } from './assembler/assembler';
-import { RAW_MIPS_REGISTER } from './language/MIPS';
 import { Memory } from './components/memory';
+import { PCU, RegisterFile } from './components/component';
 
 class SingleCycleMIPSChip {
-    /** Stores the values of the general-purpose registers */
-    private registers: { [key in RAW_MIPS_REGISTER]: number } = {
-        $0: 0,
-        $1: 0,
-        $2: 0,
-        $3: 0,
-        $4: 0,
-        $5: 0,
-        $6: 0,
-        $7: 0,
-        $8: 0,
-        $9: 0,
-        $10: 0,
-        $11: 0,
-        $12: 0,
-        $13: 0,
-        $14: 0,
-        $15: 0,
-        $16: 0,
-        $17: 0,
-        $18: 0,
-        $19: 0,
-        $20: 0,
-        $21: 0,
-        $22: 0,
-        $23: 0,
-        $24: 0,
-        $25: 0,
-        $26: 0,
-        $27: 0,
-        $28: 0,
-        $29: 0,
-        $30: 0,
-        $31: 0,
-    };
-
     /** The size of the processor memory in bytes */
     private MIPS_MEMORY_SIZE = 33554432; // 32 MiB
-
-    /** Processor Memory */
-    private memory = new Memory(this.MIPS_MEMORY_SIZE);
 
     /** The program counter (PC) register */
     private PC: number = 0;
 
     /** The speed of the internal processor clock */
     private CLOCK_SPEED = 1; // 1 kHz
+
+    // MARK: - Internal Hardware
+
+    /** Processor Memory */
+    private memory = new Memory(this.MIPS_MEMORY_SIZE);
+
+    /** Processor Registers */
+    private registerFile = new RegisterFile();
+
+    /** Processor Control Unit */
+    private PCU = new PCU();
 
     /**
      * Runs the given program on the chip. The program is a string
