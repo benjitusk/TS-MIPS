@@ -1,4 +1,4 @@
-import { Assembler } from '../Assembler/assembler';
+import { Assembler } from '../assembler/assembler';
 
 export const MIPS_ASSEMBLER_DIRECTIVES = {
     '.align': {

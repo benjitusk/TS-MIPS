@@ -1,5 +1,5 @@
 import _ from 'lodash';
-import { Assembler } from './Assembler/assembler';
+import { Assembler } from './assembler/assembler';
 import { RAW_MIPS_REGISTER } from './language/MIPS';
 import { Memory } from './components/memory';
 
