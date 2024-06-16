@@ -41,7 +41,7 @@ class SingleCycleMIPSChip {
     };
 
     /** The size of the processor memory in bytes */
-    private MIPS_MEMORY_SIZE = 1024;
+    private MIPS_MEMORY_SIZE = 33554432; // 32 MiB
 
     /** Processor Memory */
     private memory = new Memory(this.MIPS_MEMORY_SIZE);
