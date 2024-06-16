@@ -1,10 +1,9 @@
+// Use IntelliSense to learn about possible attributes.
+// Hover to view descriptions of existing attributes.
+// For more information, visit: https://go.microsoft.com/fwlink/?linkid=830387
 {
-    // Use IntelliSense to learn about possible attributes.
-    // Hover to view descriptions of existing attributes.
-    // For more information, visit: https://go.microsoft.com/fwlink/?linkid=830387
     "version": "0.2.0",
     "configurations": [
-        // Launch and debug a TSC script with npx ts-node
         {
             "type": "node",
             "request": "launch",
@@ -12,15 +11,12 @@
             "skipFiles": [
                 "<node_internals>/**"
             ],
-            "runtimeExecutable": "npx",
-            "runtimeArgs": [
-                "ts-node",
-                "--transpile-only",
-                "--files"
+            "program": "${workspaceFolder}/dist/index.js", // Adjust the entry point as needed
+            "preLaunchTask": "tsc: build - tsconfig.json", // Ensure TypeScript is compiled before debugging
+            "outFiles": [
+                "${workspaceFolder}/dist/**/*.js"
             ],
-            "program": "${workspaceFolder}/src/index.ts",
-            "sourceMaps": true,
-            // "preLaunchTask": "tsc: build - tsconfig.json",
-        },
+            "sourceMaps": true
+        }
     ]
 }
