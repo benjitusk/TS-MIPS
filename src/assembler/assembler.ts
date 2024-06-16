@@ -10,6 +10,9 @@ import {
     registerLookup,
     unaliasRegister,
     MIPS_OP,
+    MIPS_CORE_OP,
+    MIPS_NON_CORE_OP,
+    MIPS_PSEUDO_OP,
 } from '../language/MIPS';
 import { AssemblerDirective, isMIPSAssemblerDirective, MIPS_ASSEMBLER_DIRECTIVES } from '../language/ASMDirectives';
 import { isMIPSPseudoInstruction } from '../language/MIPS';
@@ -250,7 +253,8 @@ export class Assembler {
      */
     private expand(instruction: MIPSInstruction, line: number): MIPSInstruction[] {
         // Check if the instruction is a pseudo instruction
-        const [op, ...args] = instruction.split(' ');
+        const op = instruction.split(' ')[0] as MIPS_CORE_OP | MIPS_NON_CORE_OP | MIPS_PSEUDO_OP;
+        const [, ...args] = instruction.split(' ');
         if (!isMIPSPseudoInstruction(op)) return [instruction];
 
         // Expand the pseudo instruction
@@ -285,8 +289,8 @@ export class Assembler {
                 return [`slt $1, ${args[1]}, ${args[0]}`, `xori ${args[0]}, $1, 1`];
             case 'sgt':
                 return [`slt ${args[0]}, ${args[1]}, ${args[0]}`];
-            default:
-                throw new MIPSErrors.MIPSAssemblerSyntaxError(instruction, line);
+            case 'beqz':
+                return [`beq ${args[0]}, $0, ${args[1]}`];
         }
     }
 
@@ -346,13 +350,7 @@ export class Assembler {
         instructions = instructions.map((line) => line.split('#')[0]);
 
         // Replace all `:` that are not the last character on the line with `:\n`
-        instructions = instructions.map((line) => line.replace(/:(?!$)/g, ':\n'));
-
-        // Resplit any lines that were split by `:\n`
-        instructions = _(instructions)
-            .map((line) => line.split('\n'))
-            .flatten()
-            .value();
+        instructions = instructions.map(splitLabels).flat();
 
         // Clean up each instruction
         instructions = _(instructions)
@@ -695,4 +693,36 @@ function convertCharLiterals(instruction) {
             throw new Error(`Invalid character literal: ${match}`);
         }
     });
+}
+
+/**
+ * This function takes a line of MIPS assembly code and
+ * breaks it into an array.
+ *
+ * The break will be done by splitting the line by any
+ * colon (:) characters that are not inside of a string.
+ * This must be done manually without using a regex.
+ */
+function splitLabels(line: string): string[] {
+    const parts = [];
+    let currentPart = '';
+    let inString = false;
+    let inChar = false;
+    for (const char of line) {
+        if (char === '"') {
+            inString = !inString;
+        }
+        if (char === "'") {
+            inChar = !inChar;
+        }
+        if (char === ':' && !inString) {
+            currentPart += char;
+            parts.push(currentPart);
+            currentPart = '';
+        } else {
+            currentPart += char;
+        }
+    }
+    parts.push(currentPart);
+    return parts;
 }

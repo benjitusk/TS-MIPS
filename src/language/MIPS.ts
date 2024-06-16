@@ -515,6 +515,14 @@ const MIPS_PSEUDO_INSTRUCTIONS = {
             if (args.length !== 2) throw new Error('abs requires 2 arguments (rd, rs)');
         },
     },
+    beqz: {
+        type: 'I',
+        opCode: 0,
+        description: 'Branch if RS is equal to zero',
+        validate: (args) => {
+            if (args.length !== 2) throw new Error('beqz requires 2 arguments (rs, offset)');
+        },
+    },
     blt: {
         type: 'I',
         opCode: 0,
@@ -612,9 +620,9 @@ const MIPS_PSEUDO_INSTRUCTIONS = {
         },
     },
 } as const;
-type MIPSPseudoInstruction = keyof typeof MIPS_PSEUDO_INSTRUCTIONS;
-export function isMIPSPseudoInstruction(instruction: string): instruction is MIPSPseudoInstruction {
-    return _.keys(MIPS_PSEUDO_INSTRUCTIONS).includes(instruction as MIPSPseudoInstruction);
+export type MIPS_PSEUDO_OP = keyof typeof MIPS_PSEUDO_INSTRUCTIONS;
+export function isMIPSPseudoInstruction(instruction: string): instruction is MIPS_PSEUDO_OP {
+    return _.keys(MIPS_PSEUDO_INSTRUCTIONS).includes(instruction as MIPS_PSEUDO_OP);
 }
 
 export const MIPS_INSTRUCTIONS = {

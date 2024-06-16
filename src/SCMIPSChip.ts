@@ -84,10 +84,10 @@ class SingleCycleMIPSChip {
         const instruction = this.memory.readWord(this.PC);
 
         // Decode the instruction we just loaded.
-        const opCode = instruction & 0b11111100000000000000000000000000;
+        const opCode = instruction >>> 26;
 
         // Print the opcode
-        console.log([...new Uint8Array(opCode)].map((x) => x.toString(16).padStart(2, '0')).join(''));
+        console.log(`Opcode: 0x${opCode.toString(16)}`);
     }
 }
 

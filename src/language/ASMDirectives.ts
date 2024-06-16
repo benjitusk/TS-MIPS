@@ -15,8 +15,6 @@ export const MIPS_ASSEMBLER_DIRECTIVES = {
         validate: (args: string[]) => {
             // Check the number of arguments
             if (args.length < 1) throw new Error(`Invalid number of arguments: ${args}`);
-            // Check the argument is a string
-            if (!/^".*"$/.test(args.join(' '))) throw new Error(`Invalid argument: ${args.join(' ')}`);
         },
     },
     '.asciiz': {
@@ -24,8 +22,6 @@ export const MIPS_ASSEMBLER_DIRECTIVES = {
         validate: (args: string[]) => {
             // Check the number of arguments
             if (args.length < 1) throw new Error(`Invalid number of arguments: ${args}`);
-            // Check the argument is a string
-            if (!/^".*"$/.test(args.join(' '))) throw new Error(`Invalid argument: ${args.join(' ')}`);
         },
     },
     '.byte': {
