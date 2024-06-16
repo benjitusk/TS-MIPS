@@ -48,7 +48,7 @@ export class Assembler {
     /** A symbol table for tracking the labels and addresses */
     private symbolTable = {
         '.text': 0x00000000, // Start of the text segment is at address 0
-        '.data': 0x01000000, // Start of the data segment is at address 16777216 (16MiB)
+        '.data': 0x00000100, // Start of the data segment is at address 65536 (64KiB)
     } as { [label: string]: number };
 
     /**
@@ -75,6 +75,7 @@ export class Assembler {
         return this.assembleInstructions(resolvedInstructions);
     }
 
+    // MARK: - Symbol Resolution
     /**
      * Resolves all symbols in the given instructions.
      * This includes replacing all labels with their offsets,
@@ -151,7 +152,6 @@ export class Assembler {
                             case 'immediate':
                                 return arg.value;
                             case 'memory':
-                                // We need to convert op $src off($dts) to op $dts, $src, off for the assembler
                                 return `${arg.offset}(${arg.base})`;
                         }
                     })
@@ -159,12 +159,24 @@ export class Assembler {
 
                 // Expand any offset references [e.g., `lw $1, 0($2)` -> `lw $2, $1, 0`]
                 // This is necessary because the tokenizer doesn't handle this case
-                const expandedInstruction = resolvedInstruction.replace(
-                    /(\w+)\s+\$(\w+)\s*(-?\d+)\(\$(\w+)\)/g,
-                    (match, instr, rt, offset, rs) => {
-                        return `${instr} $${rs} $${rt} ${offset}`;
-                    }
-                );
+                let expandedInstruction = resolvedInstruction;
+                //     .replace(
+                //     /(\w+)\s+\$(\w+)\s*(-?\d+)\(\$(\w+)\)/g,
+                //     (match, instr, rt, offset, rs) => {
+                //         return `${instr} $${rs} $${rt} ${offset}`;
+                //     }
+                // );
+
+                // Check if the instruction has a memory reference
+                if (resolvedArgTokens.map((arg) => arg.type).includes('memory')) {
+                    // Extract the memory reference (it's the second argument in the list of tokens)
+                    const memoryReference = resolvedArgTokens.find((arg) => arg.type === 'memory')!;
+                    // get the source register (it's the first argument in the list of tokens)
+                    const source = resolvedArgTokens.find((arg) => arg.type === 'register')!.value;
+
+                    // Replace the memory reference with the expanded instruction
+                    expandedInstruction = `${command} ${source} ${memoryReference.base} ${memoryReference.offset}`;
+                }
 
                 // Replace the instruction
                 instructions[index] = expandedInstruction;
@@ -180,6 +192,7 @@ export class Assembler {
         return instructions;
     }
 
+    // MARK: - Pseudo Expansion
     /**
      * Expand all pseudo instructions in the given source code.
      */
@@ -276,6 +289,7 @@ export class Assembler {
         return this.load(machineCode, address);
     }
 
+    // MARK: - Parsing
     /**
      * Parses the given source code into individual instructions.
      *
@@ -326,13 +340,13 @@ export class Assembler {
         return instructions as MIPSInstruction[];
     }
 
+    // MARK: - Symbol Table
     /**
      * Builds the symbol table for the given instructions.
      * This is step 1 of the two-pass assembler, so our only
      * job is to build the symbol table. We do not replace
      * or remove any tokens in this step.
      */
-
     private buildSymbolTable() {
         const instructions = this.instructions;
         // Start at the beginning of where the program will be stored
@@ -360,7 +374,7 @@ export class Assembler {
             } else if (isValidLabel(command)) {
                 // It's a label, add it to the symbol table (but remove the colon)
                 const label = command.slice(0, -1);
-                this.symbolTable[label] = locationCounter[segment] + 4; // Labels are always 4 bytes ahead
+                this.symbolTable[label] = locationCounter[segment]; // Labels are always 4 bytes ahead
             } else {
                 // It's a standard 32 bit MIPS instruction, increment the location counter by 4
                 locationCounter[segment] += 4;
@@ -369,6 +383,7 @@ export class Assembler {
         this.instructions = instructions;
     }
 
+    // MARK: - Validation
     /**
      * Validates the given instructions.
      *
@@ -396,6 +411,7 @@ export class Assembler {
         }
     }
 
+    // MARK: - Assembly
     /**
      * Assembles the given instructions into machine code.
      *
@@ -417,7 +433,7 @@ export class Assembler {
             const opCode = instructionDetails.opCode;
             rawInstruction |= opCode << (32 - 6);
             switch (op) {
-                // Arithmetic and Logical Immediate Instructions `op $rt, $rs, immediate`
+                // MARK:  Arithmetic I Type
                 case 'addi':
                 case 'addiu':
                 case 'andi':
@@ -438,7 +454,8 @@ export class Assembler {
                     rawInstruction |= immediate_ << (16 - 16);
                     break;
 
-                // Load and Store Instructions `op $rt, offset($rs)`
+                // MARK: Load and Store
+                // NOTE: This isn't the standard MIPS format, but it's easier to parse
                 case 'lw':
                 case 'lh':
                 case 'lhu':
@@ -450,18 +467,24 @@ export class Assembler {
                 case 'sh':
                 case 'sc':
                     // 0xOOOOOSSSSSTTTTTIIIIIIIIIIIIIIII
+
+                    // Sometimes there's no register passed in for the offset (i.e., lw $1 label)
+                    // In that case, we need to use the $0 register b/c it translates to 000000.
+                    // This "default" register gets placed as the first argument in the instruction.
+                    if (args.length === 2) args.unshift('$0');
+
                     // Get the registers
-                    const [rt___, rs___] = args
-                        .map((reg) => reg ?? '$0') // If there's no register passed in for that argument (i.e., the jr command), use the $0 register b/c it translates to 000000
+                    const [rs___, rt___] = args
+                        .map((reg) => reg ?? '$0') // If there's no register passed in for that argument (i.e., lw $1 label), use the $0 register b/c it translates to 000000
                         .filter(isValidRegister)
                         .map(registerLookup)
                         .map((reg) => reg.registerNumber);
-                    const offset = parseInt(args[1]);
+                    const offset = parseInt(args[2]);
                     rawInstruction |= rs___ << (26 - 5);
                     rawInstruction |= rt___ << (21 - 5);
                     rawInstruction |= offset << (16 - 16);
                     break;
-                // Branch Instructions `op $rs, $rt, offset`
+                // MARK: Branch Equivalence
                 case 'bne':
                 case 'beq':
                     // 0xOOOOOSSSSSTTTTTIIIIIIIIIIIIIIII
@@ -478,7 +501,7 @@ export class Assembler {
                     rawInstruction |= offset_ << (16 - 16);
                     break;
 
-                // Branch Instructions `op $rs, offset`
+                // MARK: Branch Comparison
                 case 'bgez':
                 case 'bgezal':
                 case 'bgtz':
@@ -497,7 +520,7 @@ export class Assembler {
                     rawInstruction |= offset__ << (16 - 16);
                     break;
 
-                // Load Upper Immediate `op $rt, immediate`
+                // MARK: LUI
                 case 'lui':
                     // 0xOOOOO00000TTTTTIIIIIIIIIIIIIIII
                     // Get the registers
@@ -510,7 +533,7 @@ export class Assembler {
                     rawInstruction |= immediate____5 << 0;
                     break;
 
-                // Jump Register `op $rs`
+                // MARK: Jump Register
                 case 'jr':
                 case 'jalr':
                     // 0xOOOOOSSSSS000000000000000001000
@@ -524,7 +547,7 @@ export class Assembler {
                     rawInstruction |= instructionDetails.funct! << (6 - 6);
                     break;
 
-                // Arithmetic and Logical Instructions `op $rd, $rs, $rt`
+                // MARK: Arithmetic R Type
                 case 'add':
                 case 'addu':
                 case 'and':
@@ -554,7 +577,7 @@ export class Assembler {
                     rawInstruction |= shftAmt << (11 - 5);
                     rawInstruction |= funct << (6 - 6);
                     break;
-                // Shift Instructions `op $rd, $rt, shamt`
+                // MARK: Shift
                 case 'sll':
                 case 'srl':
                 case 'sra':
@@ -576,7 +599,7 @@ export class Assembler {
                     rawInstruction |= funct_ << (6 - 6);
                     break;
 
-                // Jump Instructions `op target`
+                // MARK: Jump
                 case 'j':
                 case 'jal':
                     // 0xOOOOOOIIIIIIIIIIIIIIIIIIIIIIIIII
