@@ -6,10 +6,10 @@ import {
     isMIPSInstruction,
     isValidLabel,
     isValidRegister,
-    MIPS_CORE_INSTRUCTIONS,
-    MIPS_OP,
+    MIPS_INSTRUCTIONS,
     registerLookup,
     unaliasRegister,
+    MIPS_OP,
 } from '../language/MIPS';
 import { AssemblerDirective, isMIPSAssemblerDirective, MIPS_ASSEMBLER_DIRECTIVES } from '../language/ASMDirectives';
 import { isMIPSPseudoInstruction } from '../language/MIPS';
@@ -41,9 +41,6 @@ export class Assembler {
 
     /** A list of instructions to be assembled */
     private instructions: MIPSInstruction[] = [];
-
-    /** A list of assembler directives to be executed */
-    private directives: AssemblerDirective[] = [];
 
     /** A symbol table for tracking the labels and addresses */
     private symbolTable = {
@@ -93,8 +90,53 @@ export class Assembler {
             '.data': this.symbolTable['.data'],
         };
 
-        // First we'll replace all references to labels with their offsets
+        // Stage 1: Calculate the final symbol table
+        // This is done by calculating the length of each instruction
+        // which can be 4 bytes (standard MIPS instruction) or 8 bytes (pseudoinstruction),
+        // and updating the symbol table with the final offset of each label.
 
+        for (let i = 0; i < instructions.length; i++) {
+            const instruction = instructions[i];
+            if (instruction === '.text' || instruction === '.data') {
+                segment = instruction;
+                continue;
+            }
+
+            const [op] = instruction.split(' ');
+            let instructionLength = 4;
+            if (isMIPSPseudoInstruction(op)) {
+                const expanded = this.expand(instruction, i + 1);
+                instructionLength = expanded.length * 4;
+                // Update the symbol table
+                for (const label in this.symbolTable) {
+                    // Skip the segment labels
+                    if (label === '.text' || label === '.data') continue;
+                    // If the label is after the current instruction, and is in the same segment
+                    // we need to increment the offset by the length of the instruction
+                    // First check if this label is in the same segment
+                    const labelSegment = this.symbolTable[label] < locationCounter['.data'] ? '.text' : '.data';
+                    if (labelSegment === segment) {
+                        if (labelSegment === '.data') debugger;
+                        // Check if the label is after the current instruction
+                        if (this.symbolTable[label] > locationCounter[segment]) {
+                            this.symbolTable[label] += instructionLength;
+                        }
+                    }
+                }
+            }
+            locationCounter[segment] += instructionLength;
+        }
+
+        // Stage 2: Replace all labels with their offsets.
+        // This had to wait until the final symbol table
+        // was calculated for offsets to be accurate.
+
+        // We also execute assembler directives at this stage.
+        let resolvedInstructions: MIPSInstruction[] = [];
+
+        // Reset the location counter
+        locationCounter['.text'] = this.symbolTable['.text'];
+        locationCounter['.data'] = this.symbolTable['.data'];
         const linesToStrip: number[] = [];
         for (const [index, instruction] of instructions.entries()) {
             const [command, ...args] = instruction.split(' ');
@@ -155,17 +197,10 @@ export class Assembler {
                                 return `${arg.offset}(${arg.base})`;
                         }
                     })
-                    .join(' ')}`;
-
+                    .join(' ')}`.trim();
                 // Expand any offset references [e.g., `lw $1, 0($2)` -> `lw $2, $1, 0`]
                 // This is necessary because the tokenizer doesn't handle this case
-                let expandedInstruction = resolvedInstruction;
-                //     .replace(
-                //     /(\w+)\s+\$(\w+)\s*(-?\d+)\(\$(\w+)\)/g,
-                //     (match, instr, rt, offset, rs) => {
-                //         return `${instr} $${rs} $${rt} ${offset}`;
-                //     }
-                // );
+                let memoryExpandedInstruction = resolvedInstruction;
 
                 // Check if the instruction has a memory reference
                 if (resolvedArgTokens.map((arg) => arg.type).includes('memory')) {
@@ -193,17 +228,6 @@ export class Assembler {
     }
 
     // MARK: - Pseudo Expansion
-    /**
-     * Expand all pseudo instructions in the given source code.
-     */
-    private expandPseudoInstructions() {
-        // Expand all pseudo instructions
-        this.instructions = _(this.instructions)
-            .map((instruction, i) => this.expand(instruction, i + 1))
-            .flatten()
-            .value();
-    }
-
     /**
      * Expands the given pseudo instruction into multiple instructions.
      *
@@ -401,7 +425,7 @@ export class Assembler {
                 }
             } else if (isMIPSInstruction(word))
                 try {
-                    MIPS_CORE_INSTRUCTIONS[word].validate(args);
+                    MIPS_INSTRUCTIONS[word].validate(args);
                 } catch (e) {
                     throw new MIPSErrors.MIPSAssemblerInstructionSyntaxError(word, index);
                 }
@@ -428,7 +452,7 @@ export class Assembler {
             const op = instruction.split(' ')[0] as MIPS_OP;
             const [, ...args] = instruction.split(' ');
             let rawInstruction = 0x00000000000000000000000000000000;
-            const instructionDetails = MIPS_CORE_INSTRUCTIONS[op];
+            const instructionDetails = MIPS_INSTRUCTIONS[op];
             // Get the 6 bit opcode
             const opCode = instructionDetails.opCode;
             rawInstruction |= opCode << (32 - 6);
@@ -610,8 +634,16 @@ export class Assembler {
                 case 'nop':
                     // 0x00000000000000000000000000000000  (nop)
                     break;
-                // case 'break':
-                // // 0x00000000000000000000000000001101  (break)
+                
+                // MARK: Non-Core
+                case 'syscall':
+                case 'break':
+                case 'eret':
+                    // 0xOOOOOO00000000000000000000FFFFFF
+                    // Get the function code
+                    const funct__ = instructionDetails.funct ?? 0;
+                    rawInstruction |= funct__ << (6 - 6);
+                    break;
                 default:
                     throw new MIPSErrors.MIPSAssemblerError('Unknown Instruction: `' + instruction + '`');
             }

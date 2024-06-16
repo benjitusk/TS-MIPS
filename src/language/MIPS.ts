@@ -1,3 +1,4 @@
+import _ from 'lodash';
 import { Tagged } from 'type-fest';
 
 const MIPS_CORE_INSTRUCTION_SET = [
@@ -207,6 +208,8 @@ export const MIPS_CORE_INSTRUCTIONS = {
         description:
             'Load byte. Load the byte at the memory address specified by RS (plus the specified offset) into RT.',
         validate: (args) => {
+            // TODO: Implement this
+            return;
             if (args.length !== 3) throw new Error('lb requires 3 arguments (rt, offset, base)');
         },
     },
@@ -260,6 +263,8 @@ export const MIPS_CORE_INSTRUCTIONS = {
         description:
             'Load word. Load a word (4 bytes) from memory at the address specified by RS (plus the specified offset) into RT.',
         validate: (args) => {
+            // TODO: Implement this
+            return;
             if (args.length !== 2) throw new Error('lw requires 2 arguments (rt, offset)');
         },
     },
@@ -302,6 +307,8 @@ export const MIPS_CORE_INSTRUCTIONS = {
         opCode: 0x28,
         description: 'Store byte. Store the least significant byte of RT at the specified memory address.',
         validate: (args) => {
+            // TODO: Implement this
+            return;
             if (args.length !== 3) throw new Error('sb requires 3 arguments (rt, offset, base)');
         },
     },
@@ -448,7 +455,7 @@ export const MIPS_CORE_INSTRUCTIONS = {
         },
     },
 } as {
-    [key in MIPS_OP]: {
+    [key in MIPS_CORE_OP]: {
         type: 'J' | 'I' | 'R';
         opCode: number;
         description: string;
@@ -458,11 +465,173 @@ export const MIPS_CORE_INSTRUCTIONS = {
     };
 };
 
-export type MIPS_OP = (typeof MIPS_CORE_INSTRUCTION_SET)[number];
+export type MIPS_CORE_OP = (typeof MIPS_CORE_INSTRUCTION_SET)[number];
 
 export function isMIPSInstruction(instruction: string): instruction is MIPS_OP {
-    return MIPS_CORE_INSTRUCTIONS[instruction as MIPS_OP] !== undefined;
+    return MIPS_INSTRUCTIONS[instruction as MIPS_CORE_OP] !== undefined;
 }
+
+const MIPS_NON_CORE_INSTRUCTIONS = {
+    syscall: {
+        type: 'R',
+        opCode: 0,
+        description: 'Generate a software interrupt',
+        funct: 0x0c,
+        validate: (args) => {
+            if (args.length !== 0) throw new Error('syscall takes no arguments');
+        },
+    },
+    break: {
+        type: 'R',
+        opCode: 0,
+        description: 'Generate a breakpoint exception',
+        funct: 0x0d,
+        validate: (args) => {
+            if (args.length !== 0) throw new Error('break takes no arguments');
+        },
+    },
+    eret: {
+        type: 'R',
+        opCode: 0x10,
+        description: 'Return from exception',
+        funct: 0x18,
+        validate: (args) => {
+            if (args.length !== 0) throw new Error('eret takes no arguments');
+        },
+    },
+} as const;
+export type MIPS_NON_CORE_OP = keyof typeof MIPS_NON_CORE_INSTRUCTIONS;
+
+export function isMIPSNonCoreInstruction(instruction: string): instruction is MIPS_NON_CORE_OP {
+    return MIPS_NON_CORE_INSTRUCTIONS[instruction as MIPS_NON_CORE_OP] !== undefined;
+}
+
+const MIPS_PSEUDO_INSTRUCTIONS = {
+    abs: {
+        type: 'R',
+        opCode: 0,
+        description: 'Set RD to the absolute value of RS',
+        validate: (args) => {
+            if (args.length !== 2) throw new Error('abs requires 2 arguments (rd, rs)');
+        },
+    },
+    blt: {
+        type: 'I',
+        opCode: 0,
+        description: 'Branch if RS is less than RT',
+        validate: (args) => {
+            if (args.length !== 3) throw new Error('blt requires 3 arguments (rs, rt, offset)');
+        },
+    },
+    bgt: {
+        type: 'I',
+        opCode: 0,
+        description: 'Branch if RS is greater than RT',
+        validate: (args) => {
+            if (args.length !== 3) throw new Error('bgt requires 3 arguments (rs, rt, offset)');
+        },
+    },
+    ble: {
+        type: 'I',
+        opCode: 0,
+        description: 'Branch if RS is less than or equal to RT',
+        validate: (args) => {
+            if (args.length !== 3) throw new Error('ble requires 3 arguments (rs, rt, offset)');
+        },
+    },
+    neg: {
+        type: 'R',
+        opCode: 0,
+        description: 'Set RD to the two’s complement negation of RS',
+        validate: (args) => {
+            if (args.length !== 2) throw new Error('neg requires 2 arguments (rd, rs)');
+        },
+    },
+    negu: {
+        type: 'R',
+        opCode: 0,
+        description: 'Set RD to the two’s complement negation of RS (unsigned)',
+        validate: (args) => {
+            if (args.length !== 2) throw new Error('negu requires 2 arguments (rd, rs)');
+        },
+    },
+    not: {
+        type: 'R',
+        opCode: 0,
+        description: 'Set RD to the bitwise NOT of RS',
+        validate: (args) => {
+            if (args.length !== 2) throw new Error('not requires 2 arguments (rd, rs)');
+        },
+    },
+    bge: {
+        type: 'I',
+        opCode: 0,
+        description: 'Branch if RS is greater than or equal to RT',
+        validate: (args) => {
+            if (args.length !== 3) throw new Error('bge requires 3 arguments (rs, rt, offset)');
+        },
+    },
+    li: {
+        type: 'I',
+        opCode: 0,
+        description: 'Load the immediate value into RD',
+        validate: (args) => {
+            if (args.length !== 2) throw new Error('li requires 2 arguments (rd, immediate)');
+        },
+    },
+    la: {
+        type: 'I',
+        opCode: 0,
+        description: 'Load the address of the label into RD',
+        validate: (args) => {
+            if (args.length !== 2) throw new Error('la requires 2 arguments (rd, label)');
+        },
+    },
+    move: {
+        type: 'R',
+        opCode: 0,
+        description: 'Move the value in RS to RD',
+        validate: (args) => {
+            if (args.length !== 2) throw new Error('move requires 2 arguments (rd, rs)');
+        },
+    },
+    sge: {
+        type: 'R',
+        opCode: 0,
+        description: 'Set RD to 1 if RS is greater than or equal to RT, otherwise set RD to 0',
+        validate: (args) => {
+            if (args.length !== 3) throw new Error('sge requires 3 arguments (rd, rs, rt)');
+        },
+    },
+    sgt: {
+        type: 'R',
+        opCode: 0,
+        description: 'Set RD to 1 if RS is greater than RT, otherwise set RD to 0',
+        validate: (args) => {
+            if (args.length !== 3) throw new Error('sgt requires 3 arguments (rd, rs, rt)');
+        },
+    },
+} as const;
+type MIPSPseudoInstruction = keyof typeof MIPS_PSEUDO_INSTRUCTIONS;
+export function isMIPSPseudoInstruction(instruction: string): instruction is MIPSPseudoInstruction {
+    return _.keys(MIPS_PSEUDO_INSTRUCTIONS).includes(instruction as MIPSPseudoInstruction);
+}
+
+export const MIPS_INSTRUCTIONS = {
+    ...MIPS_CORE_INSTRUCTIONS,
+    ...MIPS_PSEUDO_INSTRUCTIONS,
+    ...MIPS_NON_CORE_INSTRUCTIONS,
+} as {
+    [key in MIPS_CORE_OP | MIPS_NON_CORE_OP]: {
+        type: 'J' | 'I' | 'R';
+        opCode: number;
+        description: string;
+        validate: (args: string[]) => void;
+        funct?: number;
+        shftAmt?: number;
+    };
+};
+export type MIPS_OP = MIPS_CORE_OP | MIPS_NON_CORE_OP;
 
 const REGISTER_UNALIAS = {
     $zero: '$0',
@@ -697,23 +866,4 @@ export function isValidLabel(label: string): label is MIPS_LABEL {
     // return /^[a-zA-Z_][a-zA-Z0-9_]*$/.test(label);
     // Use the above regex and also make sure it ends with a colon
     return /^[a-zA-Z_][a-zA-Z0-9_]*:$/.test(label);
-}
-const MIPS_PSEUDO_INSTRUCTIONS = [
-    'abs',
-    'blt',
-    'bgt',
-    'ble',
-    'neg',
-    'negu',
-    'not',
-    'bge',
-    'li',
-    'la',
-    'move',
-    'sge',
-    'sgt',
-] as const;
-type MIPSPseudoInstruction = (typeof MIPS_PSEUDO_INSTRUCTIONS)[number];
-export function isMIPSPseudoInstruction(instruction: string): instruction is MIPSPseudoInstruction {
-    return MIPS_PSEUDO_INSTRUCTIONS.includes(instruction as MIPSPseudoInstruction);
 }
