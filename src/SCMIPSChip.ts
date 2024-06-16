@@ -1,5 +1,5 @@
 import _ from 'lodash';
-import { Assembler } from './utils/assembler';
+import { Assembler } from './Assembler/assembler';
 import { RAW_MIPS_REGISTER } from './language/MIPS';
 import { Memory } from './components/memory';
 
@@ -69,7 +69,8 @@ class SingleCycleMIPSChip {
         this.PC = 0;
 
         // Start the clock cycle
-        this.startClock();
+        // this.startClock();
+        this.tick();
     }
 
     private startClock() {
@@ -81,10 +82,9 @@ class SingleCycleMIPSChip {
     private tick() {
         // Fetch the instruction at the PC
         const instruction = this.memory.readWord(this.PC);
-        const rawInstruction = instruction.buffer;
 
         // Decode the instruction we just loaded.
-        const opCode = rawInstruction.slice(0, 6);
+        const opCode = instruction & 0b11111100000000000000000000000000;
 
         // Print the opcode
         console.log([...new Uint8Array(opCode)].map((x) => x.toString(16).padStart(2, '0')).join(''));
