@@ -14,18 +14,18 @@ export const MIPS_ASSEMBLER_DIRECTIVES = {
         description: 'Store a string in memory but do not null-terminate it',
         validate: (args: string[]) => {
             // Check the number of arguments
-            if (args.length !== 1) throw new Error(`Invalid number of arguments: ${args}`);
+            if (args.length < 1) throw new Error(`Invalid number of arguments: ${args}`);
             // Check the argument is a string
-            if (!/^".*"$/.test(args[0])) throw new Error(`Invalid argument: ${args[0]}`);
+            if (!/^".*"$/.test(args.join(' '))) throw new Error(`Invalid argument: ${args.join(' ')}`);
         },
     },
     '.asciiz': {
         description: 'Store a string in memory and null-terminate it',
         validate: (args: string[]) => {
             // Check the number of arguments
-            if (args.length !== 1) throw new Error(`Invalid number of arguments: ${args}`);
+            if (args.length < 1) throw new Error(`Invalid number of arguments: ${args}`);
             // Check the argument is a string
-            if (!/^".*"$/.test(args[0])) throw new Error(`Invalid argument: ${args[0]}`);
+            if (!/^".*"$/.test(args.join(' '))) throw new Error(`Invalid argument: ${args.join(' ')}`);
         },
     },
     '.byte': {
@@ -145,20 +145,26 @@ export class AssemblerDirective {
                 // Nothing to do here, the forward offset will take care of alignment
                 break;
             case '.ascii':
-                // Store a string in memory but do not null-terminate it
-                const ascii = this.args[0].slice(1, -1);
-                const buffer = new Uint8Array(ascii.length);
-                for (let i = 0; i < ascii.length; i++) {
-                    buffer[i] = ascii.charCodeAt(i);
+                // Store a string in memory and null-terminate it
+                const ascii = this.args.join(' ').slice(1, -1); // Remove quotes
+                // Unescape things like \n, \t, etc.
+                const asciiValues = AsciiConverter.convertToAsciiArray(ascii);
+
+                const buffer = new Uint8Array(asciiValues.length + 1);
+                for (const [i, value] of asciiValues.entries()) {
+                    buffer[i] = value;
                 }
                 memory.write(this.locationCounter, buffer);
                 break;
             case '.asciiz':
                 // Store a string in memory and null-terminate it
-                const asciiz = this.args[0].slice(1, -1);
-                const bufferz = new Uint8Array(asciiz.length + 1);
-                for (let i = 0; i < asciiz.length; i++) {
-                    bufferz[i] = asciiz.charCodeAt(i);
+                const asciiz = this.args.join(' ').slice(1, -1); // Remove quotes
+                // Unescape things like \n, \t, etc.
+                const asciizValues = AsciiConverter.convertToAsciiArray(asciiz);
+
+                const bufferz = new Uint8Array(asciizValues.length + 1);
+                for (const [i, value] of asciizValues.entries()) {
+                    bufferz[i] = value;
                 }
                 bufferz[asciiz.length] = 0;
                 memory.write(this.locationCounter, bufferz);
@@ -226,9 +232,9 @@ export class AssemblerDirective {
                 const remainder = alignment - (this.locationCounter % alignment);
                 return remainder === alignment ? 0 : remainder;
             case '.ascii':
-                return this.args[0].length;
+                return AsciiConverter.convertToAsciiArray(this.args.join(' ').slice(1, -1)).length;
             case '.asciiz':
-                return this.args[0].length + 1;
+                return AsciiConverter.convertToAsciiArray(this.args.join(' ').slice(1, -1)).length + 1;
             case '.byte':
                 return this.args.length;
             case '.data':
@@ -248,5 +254,72 @@ export class AssemblerDirective {
             default:
                 throw new Error(`Unknown directive: ${this.directive}`);
         }
+    }
+}
+
+export class AsciiConverter {
+    public static convertToAsciiArray(inputString: string): number[] {
+        const result: number[] = [];
+        let i = 0;
+
+        while (i < inputString.length) {
+            if (inputString[i] === '\\') {
+                if (i + 1 < inputString.length) {
+                    const nextChar = inputString[i + 1];
+                    switch (nextChar) {
+                        case 'n':
+                            result.push(10); // ASCII for newline
+                            i += 2;
+                            break;
+                        case 't':
+                            result.push(9); // ASCII for tab
+                            i += 2;
+                            break;
+                        case 'r':
+                            result.push(13); // ASCII for carriage return
+                            i += 2;
+                            break;
+                        case 'b':
+                            result.push(8); // ASCII for backspace
+                            i += 2;
+                            break;
+                        case 'f':
+                            result.push(12); // ASCII for form feed
+                            i += 2;
+                            break;
+                        case 'v':
+                            result.push(11); // ASCII for vertical tab
+                            i += 2;
+                            break;
+                        case '\\':
+                            result.push(92); // ASCII for backslash
+                            i += 2;
+                            break;
+                        case '"':
+                            result.push(34); // ASCII for double quote
+                            i += 2;
+                            break;
+                        case "'":
+                            result.push(39); // ASCII for single quote
+                            i += 2;
+                            break;
+                        default:
+                            // Unrecognized escape sequence, treat as normal characters
+                            result.push(inputString.charCodeAt(i));
+                            i++;
+                            break;
+                    }
+                } else {
+                    // Handle the case where backslash is at the end of the string
+                    result.push(inputString.charCodeAt(i));
+                    i++;
+                }
+            } else {
+                result.push(inputString.charCodeAt(i));
+                i++;
+            }
+        }
+
+        return result;
     }
 }
