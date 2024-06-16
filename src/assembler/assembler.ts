@@ -114,11 +114,11 @@ export class Assembler {
                     // If the label is after the current instruction, and is in the same segment
                     // we need to increment the offset by the length of the instruction
                     // First check if this label is in the same segment
-                    const labelSegment = this.symbolTable[label] < locationCounter['.data'] ? '.text' : '.data';
+                    const labelSegment = this.symbolTable[label] < this.symbolTable['.data'] ? '.text' : '.data';
                     if (labelSegment === segment) {
                         if (labelSegment === '.data') debugger;
                         // Check if the label is after the current instruction
-                        if (this.symbolTable[label] > locationCounter[segment]) {
+                        if (this.symbolTable[label] > locationCounter[segment] + instructionLength) {
                             this.symbolTable[label] += instructionLength;
                         }
                     }
@@ -233,8 +233,7 @@ export class Assembler {
         // we can actually split up instructions.
         const expandedInstructions: MIPSInstruction[] = [];
         for (const instruction of resolvedInstructions) {
-            const expanded = this.expand(instruction, 0);
-            console.log(`${instruction} -> ${expanded}`);
+            const expanded = this.expand(instruction, 0).map((instruction) => instruction.replace(/,/g, ''));
             expandedInstructions.push(...expanded);
         }
 
@@ -273,15 +272,13 @@ export class Assembler {
             case 'bge':
                 return [`slt $1, ${args[1]}, ${args[0]}`, `beq $1, $0, ${args[2]}`];
             case 'li':
-                return [
-                    `lui ${args[0]}, ${parseInt(args[1]) >> 16}`,
-                    `ori ${args[0]}, ${args[0]}, ${parseInt(args[1]) & 0xffff}`,
-                ];
+                const li_upperImm = (parseInt(args[1]) >>> 16) & 0xffff;
+                const li_lowerImm = parseInt(args[1]) & 0xffff;
+                return [`lui ${args[0]}, ${li_upperImm}`, `ori ${args[0]}, ${args[0]}, ${li_lowerImm}`];
             case 'la':
-                return [
-                    `lui ${args[0]}, ${this.symbolTable[args[1]] >> 16}`,
-                    `ori ${args[0]}, ${args[0]}, ${this.symbolTable[args[1]] & 0xffff}`,
-                ];
+                const la_upperImm = (parseInt(args[1]) >>> 16) & 0xffff;
+                const la_lowerImm = parseInt(args[1]) & 0xffff;
+                return [`lui ${args[0]}, ${la_upperImm}`, `ori ${args[0]}, ${args[0]}, ${la_lowerImm}`];
             case 'move':
                 return [`add ${args[0]}, $0, ${args[1]}`];
             case 'sge':
@@ -547,12 +544,12 @@ export class Assembler {
                 case 'bltzal':
                     // 0xOOOOOSSSSSIIIIIIIIIIIIIIIIIIIII
                     // Get the registers
-                    const [rs_____, offset__] = args
+                    const [rs_____] = args
                         .map((reg) => reg ?? '$0') // If there's no register passed in for that argument (i.e., the jr command), use the $0 register b/c it translates to 000000
                         .filter(isValidRegister)
                         .map(registerLookup)
                         .map((reg) => reg.registerNumber);
-
+                    const offset__ = parseInt(args[1]);
                     rawInstruction |= rs_____ << (26 - 5);
                     rawInstruction |= offset__ << (16 - 16);
                     break;
@@ -561,12 +558,13 @@ export class Assembler {
                 case 'lui':
                     // 0xOOOOO00000TTTTTIIIIIIIIIIIIIIII
                     // Get the registers
-                    const [rt____5, immediate____5] = args
+                    const [rt____5] = args
                         .map((reg) => reg ?? '$0') // If there's no register passed in for that argument (i.e., the jr command), use the $0 register b/c it translates to 000000
                         .filter(isValidRegister)
                         .map(registerLookup)
                         .map((reg) => reg.registerNumber);
-                    rawInstruction |= rt____5 << (16 - 5);
+                    const immediate____5 = parseInt(args[1]);
+                    rawInstruction |= rt____5 << (21 - 5);
                     rawInstruction |= immediate____5 << 0;
                     break;
 
