@@ -21,20 +21,14 @@ interface MemoryOperand {
 
 export class Tokenizer {
     /**
-     * A private field to store the current instruction.
-     */
-    private static currentInstruction: string = '';
-
-    /**
      * Tokenizes a valid MIPS instruction and returns an AST.
      *
      * @param instruction - The MIPS instruction string to tokenize.
      * @returns An AST representing the instruction.
      */
     public static parse(instruction: string): MIPSInstructionAST {
-        this.currentInstruction = instruction;
-        const tokens = this.tokenize(instruction);
-        return this.buildAST(tokens);
+        const tokens = Tokenizer.tokenize(instruction);
+        return Tokenizer.buildAST(tokens);
     }
 
     /**
@@ -88,7 +82,7 @@ export class Tokenizer {
      */
     private static buildAST(tokens: string[]): MIPSInstructionAST {
         const operation = tokens.shift()!;
-        const operands = tokens.map((token) => this.parseOperand(token));
+        const operands = tokens.map((token) => Tokenizer.parseOperand(token));
 
         return {
             operation,

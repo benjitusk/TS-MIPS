@@ -1,4 +1,4 @@
-import { Tokenizer } from '../../assembler/tokenizer';
+import { Tokenizer } from '../../Assembler/tokenizer';
 import { Test } from '../test';
 
 export class TokenizerTest extends Test {
