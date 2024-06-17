@@ -1,7 +1,8 @@
 import _ from 'lodash';
 import { Assembler } from './assembler/assembler';
 import { Memory } from './components/memory';
-import { PCU, RegisterFile } from './components/component';
+import { PCU } from './components/PCU';
+import { RegisterFile } from './components/RegisterFile';
 import { MUX } from './components/mux';
 import { SignExtender16To32 } from './components/signExtender';
 import { ALUControl } from './components/aluControl';

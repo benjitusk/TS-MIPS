@@ -1,7 +1,3 @@
-/**
- * The MIPS register file.
- */
-
 import { RAW_MIPS_REGISTER } from '../language/MIPS';
 import { word, bit } from '../types';
 
@@ -9,7 +5,9 @@ export class RegisterFile {
     /**
      * The private registers of the MIPS register file.
      */
-    private registers: { [key in RAW_MIPS_REGISTER]: number } = {
+    private registers: {
+        [key in RAW_MIPS_REGISTER]: number;
+    } = {
         $0: 0,
         $1: 0,
         $2: 0,
@@ -87,26 +85,5 @@ export class RegisterFile {
         // Do stuff with the registers
         // Write to the registers
         // Set the output
-    }
-}
-
-export class PCU {
-    /**
-     * The opcode of the current instruction.
-     */
-    private opcode: number = 0;
-
-    /**
-     * Set the opcode of the current instruction.
-     */
-    public setOpcode(opcode: number) {
-        this.opcode = opcode;
-    }
-
-    /**
-     * Execute a clock cycle.
-     */
-    public execute() {
-        // Do stuff with the opcode
     }
 }
