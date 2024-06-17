@@ -100,12 +100,27 @@ export class Assembler {
 
         for (let i = 0; i < instructions.length; i++) {
             const instruction = instructions[i];
+            if (isValidLabel(instruction)) continue;
             if (instruction === '.text' || instruction === '.data') {
                 segment = instruction;
                 continue;
             }
 
-            const [op] = instruction.split(' ');
+            const [op, ...args] = instruction.split(' ');
+            if (isMIPSAssemblerDirective(op)) {
+                // Build the directive
+                const directive = new AssemblerDirective(this, op, args, locationCounter[segment]);
+
+                // Calculate the forward offset
+                const forwardOffset = directive.calculateForwardOffset();
+
+                // Update the location counter
+                locationCounter[segment] += forwardOffset;
+
+                // Go to the next instruction
+                continue;
+            }
+
             let instructionLength = 4;
             if (isMIPSPseudoInstruction(op)) {
                 const expanded = this.expand(instruction, i + 1);
@@ -121,8 +136,8 @@ export class Assembler {
                     if (labelSegment === segment) {
                         if (labelSegment === '.data') debugger;
                         // Check if the label is after the current instruction
-                        if (this.symbolTable[label] > locationCounter[segment] + instructionLength) {
-                            this.symbolTable[label] += instructionLength;
+                        if (this.symbolTable[label] >= locationCounter[segment] + instructionLength) {
+                            this.symbolTable[label] += instructionLength - 4; // -4 because we originally "double counted" the length of a single instruction during our first pass
                         }
                     }
                 }
