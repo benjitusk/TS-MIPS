@@ -483,7 +483,7 @@ export class Assembler {
                     const immediate_ = parseInt(args[2]);
                     rawInstruction |= rs__ << (26 - 5);
                     rawInstruction |= rt__ << (21 - 5);
-                    rawInstruction |= immediate_ << (16 - 16);
+                    rawInstruction |= (immediate_ & 0xffff) << (16 - 16);
                     break;
 
                 // MARK: Load and Store
@@ -514,7 +514,7 @@ export class Assembler {
                     const offset = parseInt(args[2]);
                     rawInstruction |= rs___ << (26 - 5);
                     rawInstruction |= rt___ << (21 - 5);
-                    rawInstruction |= offset << (16 - 16);
+                    rawInstruction |= (offset & 0xffff) << (16 - 16);
                     break;
                 // MARK: Branch Equivalence
                 case 'bne':
@@ -530,7 +530,7 @@ export class Assembler {
                     const offset_ = parseInt(args[2]);
                     rawInstruction |= rs____ << (26 - 5);
                     rawInstruction |= rt____ << (21 - 5);
-                    rawInstruction |= offset_ << (16 - 16);
+                    rawInstruction |= (offset_ & 0xffff) << (16 - 16);
                     break;
 
                 // MARK: Branch Comparison
@@ -549,7 +549,7 @@ export class Assembler {
                         .map((reg) => reg.registerNumber);
                     const offset__ = parseInt(args[1]);
                     rawInstruction |= rs_____ << (26 - 5);
-                    rawInstruction |= offset__ << (16 - 16);
+                    rawInstruction |= (offset__ & 0xffff) << (16 - 16);
                     break;
 
                 // MARK: LUI
@@ -563,7 +563,7 @@ export class Assembler {
                         .map((reg) => reg.registerNumber);
                     const immediate____5 = parseInt(args[1]);
                     rawInstruction |= rt____5 << (21 - 5);
-                    rawInstruction |= immediate____5 << 0;
+                    rawInstruction |= (immediate____5 & 0xffff) << 0;
                     break;
 
                 // MARK: Jump Register
@@ -638,7 +638,7 @@ export class Assembler {
                     // 0xOOOOOOIIIIIIIIIIIIIIIIIIIIIIIIII
                     // Get the immediate value
                     const immediate = parseInt(args[0]);
-                    rawInstruction |= immediate << (26 - 26);
+                    rawInstruction |= (immediate & 0x3ffffff) << (26 - 26);
                     break;
                 case 'nop':
                     // 0x00000000000000000000000000000000  (nop)
