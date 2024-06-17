@@ -513,6 +513,7 @@ export class Assembler {
                 case 'sb':
                 case 'sh':
                 case 'sc':
+                    // Incoming instruction is in form op $rt $rs, Offset
                     // 0xOOOOOSSSSSTTTTTIIIIIIIIIIIIIIII
 
                     // Sometimes there's no register passed in for the offset (i.e., lw $1 label)
@@ -521,7 +522,7 @@ export class Assembler {
                     if (args.length === 2) args.unshift('$0');
 
                     // Get the registers
-                    const [rs___, rt___] = args
+                    const [rt___, rs___] = args
                         .map((reg) => reg ?? '$0') // If there's no register passed in for that argument (i.e., lw $1 label), use the $0 register b/c it translates to 000000
                         .filter(isValidRegister)
                         .map(registerLookup)
