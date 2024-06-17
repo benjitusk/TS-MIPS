@@ -3,15 +3,9 @@
  */
 
 import { RAW_MIPS_REGISTER } from '../language/MIPS';
-type bit = 0 | 1;
-type byte = [bit, bit, bit, bit, bit, bit, bit, bit];
-type word = [...byte, ...byte, ...byte, ...byte];
+import { word, bit } from '../types';
 
-abstract class Component {
-    abstract tick(): void;
-}
-
-export class RegisterFile extends Component {
+export class RegisterFile {
     /**
      * The private registers of the MIPS register file.
      */
@@ -88,7 +82,7 @@ export class RegisterFile extends Component {
     /**
      * Execute a clock cycle.
      */
-    public tick() {
+    public execute() {
         // Read the registers
         // Do stuff with the registers
         // Write to the registers
@@ -96,39 +90,23 @@ export class RegisterFile extends Component {
     }
 }
 
-export class PCU extends Component {
+export class PCU {
     /**
      * The opcode of the current instruction.
      */
-    public opcode: number = 0;
+    private opcode: number = 0;
 
     /**
-     * The outputs of the PCU.
+     * Set the opcode of the current instruction.
      */
-    public output: {
-        ALUOp: number;
-        ALUSrc: number;
-        Branch: number;
-        Jump: number;
-        MemRead: number;
-        MemToReg: number;
-        MemWrite: number;
-        RegDst: number;
-        RegWrite: number;
-    } = {
-        ALUOp: 0,
-        ALUSrc: 0,
-        Branch: 0,
-        Jump: 0,
-        MemRead: 0,
-        MemToReg: 0,
-        MemWrite: 0,
-        RegDst: 0,
-        RegWrite: 0,
-    };
-    public tick() {
-        // Read the instruction
-        // Decode the instruction
-        // Set the output
+    public setOpcode(opcode: number) {
+        this.opcode = opcode;
+    }
+
+    /**
+     * Execute a clock cycle.
+     */
+    public execute() {
+        // Do stuff with the opcode
     }
 }

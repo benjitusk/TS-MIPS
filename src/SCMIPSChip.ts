@@ -2,6 +2,29 @@ import _ from 'lodash';
 import { Assembler } from './assembler/assembler';
 import { Memory } from './components/memory';
 import { PCU, RegisterFile } from './components/component';
+import { MUX } from './components/mux';
+import { SignExtender16To32 } from './components/signExtender';
+import { ALUControl } from './components/aluControl';
+
+class BITMASKS {
+    public static readonly OPCODE = 0b11111100000000000000000000000000;
+    public static readonly RS = 0b00000011111000000000000000000000;
+    public static readonly RT = 0b00000000000111110000000000000000;
+    public static readonly RD = 0b00000000000000001111100000000000;
+    public static readonly SHAMT = 0b00000000000000000000011111000000;
+    public static readonly FUNCT = 0b00000000000000000000000000111111;
+    public static readonly IMMEDIATE = 0b00000000000000001111111111111111;
+    public static readonly ADDRESS = 0b00000011111111111111111111111111;
+
+    public static readonly OPCODE_SHIFT = 26;
+    public static readonly RS_SHIFT = 21;
+    public static readonly RT_SHIFT = 16;
+    public static readonly RD_SHIFT = 11;
+    public static readonly SHAMT_SHIFT = 6;
+    public static readonly FUNCT_SHIFT = 0;
+    public static readonly IMMEDIATE_SHIFT = 0;
+    public static readonly ADDRESS_SHIFT = 0;
+}
 
 class SingleCycleMIPSChip {
     /** The size of the processor memory in bytes */
@@ -23,6 +46,15 @@ class SingleCycleMIPSChip {
 
     /** Processor Control Unit */
     private PCU = new PCU();
+
+    /** MUX at register file write register */
+    private writeRegisterMUX = new MUX();
+
+    /** 16 to 32 bit sign extender */
+    private signExtender = new SignExtender16To32();
+
+    /** ALU Control Unit */
+    private ALUControl = new ALUControl();
 
     /**
      * Runs the given program on the chip. The program is a string
@@ -52,42 +84,107 @@ class SingleCycleMIPSChip {
 
     // This method is called for each clock cycle
     private tick() {
-        // Fetch the instruction at the PC
+        this.fetchInstruction();
+        this.decodeInstruction();
+        this.executeInstruction();
+        this.memoryAccess();
+        this.writeBack();
+    }
+
+    private fetchInstruction() {
+        // Fetch the instruction from memory at the address in the PC
         const instruction = this.memory.readWord(this.PC);
 
-        // Decode the instruction we just loaded.
-        // The opcode is the top 6 bits of the instruction
-        const opCode = instruction >>> 26;
-        // The rest of the instruction is split into different fields
+        // Break out the instruction into its component parts
+        // Opcode, Rs, Rt, Rd, Shamt, Funct, Immediate, Address
 
-        // R-Type / I-Type
-        // 5 bits for rs (source register)
-        const rs = (instruction >>> 21) & 0x1f;
-        // 5 bits for rt (target register)
-        const rt = (instruction >>> 16) & 0x1f;
-        // 5 bits for rd (destination register)
-        const rd = (instruction >>> 11) & 0x1f;
+        /**
+         * The opcode of the instruction.
+         *
+         * The PCU will use this to determine the type of instruction.
+         *
+         * The opcode is the first 6 bits of the instruction. [31:26]
+         */
+        const opcode = (instruction & BITMASKS.OPCODE) >>> BITMASKS.OPCODE_SHIFT;
 
-        // R-Type only
-        // 5 bits for shamt (shift amount)
-        const shamt = (instruction >>> 6) & 0x1f;
-        // 6 bits for funct (function)
-        const funct = instruction & 0x3f;
+        /**
+         * The source register for the instruction.
+         *
+         * The register file will use this to read the value from the register.
+         *
+         * The source register occupies the bits [25:21] of the instruction.
+         */
+        const rs = (instruction & BITMASKS.RS) >>> BITMASKS.RS_SHIFT;
 
-        // I-Type only
-        // 16 bits for immediate value
-        const imm = instruction & 0xffff;
+        /**
+         * The target register for the instruction.
+         *
+         * The register file will use this to read the value from the register.
+         *
+         * The target register occupies the bits [20:16] of the instruction.
+         */
+        const rt = (instruction & BITMASKS.RT) >>> BITMASKS.RT_SHIFT;
 
-        // J-Type only
-        // 26 bits for jump address
-        const addr = instruction & 0x3ffffff;
+        /**
+         * The destination register for the instruction.
+         *
+         * The register file will use this to write the value to the register.
+         *
+         * The destination register occupies the bits [15:11] of the instruction.
+         */
+        const rd = (instruction & BITMASKS.RD) >>> BITMASKS.RD_SHIFT;
 
-        // Split it into an array of bits
-        const opBits = numberToBitString(opCode, 6);
+        /**
+         * The shift amount for the instruction.
+         *
+         * The ALU will use this to perform shift operations.
+         *
+         * The shift amount occupies the bits [10:6] of the instruction.
+         */
+        const shamt = (instruction & BITMASKS.SHAMT) >>> BITMASKS.SHAMT_SHIFT;
 
-        // Print the opcode
-        console.log(`Opcode: 0x${opCode.toString(16)}`);
+        /**
+         * The function code for the instruction.
+         *
+         * The ALU will use this to determine the operation to perform.
+         *
+         * The function code occupies the bits [5:0] of the instruction.
+         */
+        const funct = (instruction & BITMASKS.FUNCT) >>> BITMASKS.FUNCT_SHIFT;
+
+        /**
+         * The immediate value for the instruction.
+         *
+         * The sign extender will use this to extend the immediate value to 32 bits.
+         *
+         * The immediate value occupies the bits [15:0] of the instruction.
+         */
+        const immediate = (instruction & BITMASKS.IMMEDIATE) >>> BITMASKS.IMMEDIATE_SHIFT;
+
+        /**
+         * The address for the instruction.
+         *
+         * The jump unit will use this to set the PC to the new address.
+         *
+         * The address occupies the bits [25:0] of the instruction.
+         */
+        const address = (instruction & BITMASKS.ADDRESS) >>> BITMASKS.ADDRESS_SHIFT;
+
+        // Pass the components to the next stage of the pipeline
+        this.PCU.setOpcode(opcode);
+        this.registerFile.readRegister1 = rs;
+        this.writeRegisterMUX.setInputs(rt, rd);
+        this.signExtender.setInput(immediate);
+        this.ALUControl.setFunctionCode(funct);
     }
+
+    private decodeInstruction() {}
+
+    private executeInstruction() {}
+
+    private memoryAccess() {}
+
+    private writeBack() {}
 }
 
 export default SingleCycleMIPSChip;
