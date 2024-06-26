@@ -6,16 +6,20 @@ import { Connector } from './connector';
 export abstract class Component {
     private static _instances: Component[] = [];
 
-    static doSingleClockCycle() {
+    static doClockTick() {
         // Update all components until no more changes are detected
         let hasChanged = true;
         let i = 1;
         while (hasChanged) {
-            console.log('Performing clock cycle, iteration ', i++);
+            // console.log('Performing clock cycle, iteration', i++);
             hasChanged = false;
             for (const instance of Component._instances) {
                 hasChanged = instance.update() || hasChanged;
             }
+        }
+        // Trigger clock tick callbacks
+        for (const instance of Component._instances) {
+            instance.onTick();
         }
     }
 
@@ -28,6 +32,9 @@ export abstract class Component {
      * Returns true if the component's output has changed.
      */
     protected abstract update(): boolean;
+
+    /** Implement clock tick (for clock-controlled components, ie registers) */
+    protected onTick() {}
 }
 
 /**
