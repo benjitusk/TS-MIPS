@@ -1,61 +1,147 @@
 import _ from 'lodash';
 import { Assembler } from './assembler/assembler';
-import { Memory } from './components/memory';
+import { Memory as InternalMemory } from './components/memory';
 import { PCU } from './components/PCU';
 import { RegisterFile } from './components/RegisterFile';
-import { MUX } from './components/mux';
-import { SignExtender16To32 } from './components/signExtender';
+import { Adder, AndGate, Component, Connector, ZeroExtender } from './hardware';
+import { InstructionSplitter } from './hardware/instructionSplitter';
+import { MUX } from './hardware/mux';
 import { ALUControl } from './components/aluControl';
-
-class BITMASKS {
-    public static readonly OPCODE = 0b11111100000000000000000000000000;
-    public static readonly RS = 0b00000011111000000000000000000000;
-    public static readonly RT = 0b00000000000111110000000000000000;
-    public static readonly RD = 0b00000000000000001111100000000000;
-    public static readonly SHAMT = 0b00000000000000000000011111000000;
-    public static readonly FUNCT = 0b00000000000000000000000000111111;
-    public static readonly IMMEDIATE = 0b00000000000000001111111111111111;
-    public static readonly ADDRESS = 0b00000011111111111111111111111111;
-
-    public static readonly OPCODE_SHIFT = 26;
-    public static readonly RS_SHIFT = 21;
-    public static readonly RT_SHIFT = 16;
-    public static readonly RD_SHIFT = 11;
-    public static readonly SHAMT_SHIFT = 6;
-    public static readonly FUNCT_SHIFT = 0;
-    public static readonly IMMEDIATE_SHIFT = 0;
-    public static readonly ADDRESS_SHIFT = 0;
-}
+import { ALU } from './components/alu';
+import { InstructionMemory } from './components/instructionMemory';
+import { MemoryFile } from './components/memoryFile';
+import { PC } from './components/PC';
+import { ShiftLeft } from './components/shiftLeft';
 
 class SingleCycleMIPSChip {
-    /** The size of the processor memory in bytes */
-    private MIPS_MEMORY_SIZE = 33554432; // 32 MiB
+    // MARK: - Chip Config
 
-    /** The program counter (PC) register */
-    private PC: number = 0;
+    /** The size of the processor memory in bytes */
+    private readonly MIPS_MEMORY_SIZE = 33554432; // 32 MiB
 
     /** The speed of the internal processor clock */
-    private CLOCK_SPEED = 1; // 1 kHz
+    private readonly CLOCK_SPEED = 1; // 1 kHz
+
+    /** Processor Memory */
+    private readonly memory = new InternalMemory(this.MIPS_MEMORY_SIZE);
 
     // MARK: - Internal Hardware
 
-    /** Processor Memory */
-    private memory = new Memory(this.MIPS_MEMORY_SIZE);
-
-    /** Processor Registers */
-    private registerFile = new RegisterFile();
+    /** Instruction Memory */
+    private readonly instructionMemory = new InstructionMemory(this.memory);
+    private readonly instructionSplitter = new InstructionSplitter();
 
     /** Processor Control Unit */
-    private PCU = new PCU();
+    private readonly PCU = new PCU();
 
-    /** MUX at register file write register */
-    private writeRegisterMUX = new MUX();
+    /** Processor Registers */
+    private readonly registerFile = new RegisterFile();
+    private readonly regFileWriteRegMux = new MUX(5);
+    private readonly regFileWriteDataMux = new MUX(32);
 
     /** 16 to 32 bit sign extender */
-    private signExtender = new SignExtender16To32();
+    private readonly signExtender = new ZeroExtender(16, 32);
 
     /** ALU Control Unit */
-    private ALUControl = new ALUControl();
+    private readonly ALUControl = new ALUControl();
+
+    /** Arithmetic and Logic Unit */
+    private readonly ALU = new ALU();
+    private readonly ALUInput2Mux = new MUX(32);
+
+    /** Processor Memory File */
+    private readonly memoryFile = new MemoryFile();
+
+    /** Program Counter */
+    private readonly PC = new PC(this.memory);
+    private readonly PCAdder = new Adder();
+
+    /** Branch Computation */
+    private readonly SLL2 = new ShiftLeft(32, 2);
+    private readonly branchAdder = new Adder();
+    private readonly branchMux = new MUX(32);
+
+    // MARK: - Connections
+    constructor() {
+        // Input for the PC comes from the Branch Mux
+        Connector.connect(this.branchMux.output, this.PC.input);
+        // Input for the instruction memory comes from the PC
+        Connector.connect(this.PC.output, this.instructionMemory.addressInput);
+
+        // Input for the instruction splitter comes from the instruction memory
+        Connector.connect(this.instructionMemory.output, this.instructionSplitter.input);
+
+        // Input for the Register File Read Registers comes from RS and RT
+        Connector.connect(this.instructionSplitter.outputs.rs, this.registerFile.readRegisterOne);
+        Connector.connect(this.instructionSplitter.outputs.rt, this.registerFile.readRegisterTwo);
+
+        // Input for the Register File Write Register comes from the WriteRegister Mux
+        Connector.connect(this.regFileWriteRegMux.output, this.registerFile.writeRegister);
+
+        // Input for the Register File Write Data comes from the WriteData Mux
+        Connector.connect(this.regFileWriteDataMux.output, this.registerFile.writeData);
+
+        // Input for the Register File Reg Write Control comes from the PCU
+        Connector.connect(this.PCU.regWrite, this.registerFile.regWrite);
+
+        // Input from the mux comes from RT/RD and regDest Control Line
+        Connector.connect(this.instructionSplitter.outputs.rt, this.regFileWriteRegMux.inputA);
+        Connector.connect(this.instructionSplitter.outputs.rd, this.regFileWriteRegMux.inputB);
+        Connector.connect(this.PCU.regDst, this.regFileWriteRegMux.control);
+
+        // Input for the PCU comes from the opcode of the instruction
+        Connector.connect(this.instructionSplitter.outputs.opCode, this.PCU.input);
+
+        // Input for the ALUControl comes from the funct field of the instruction
+        Connector.connect(this.instructionSplitter.outputs.funct, this.ALUControl.functInput);
+
+        // Input for the SignExtender comes from the imm field of the instruction
+        Connector.connect(this.instructionSplitter.outputs.imm, this.signExtender.input);
+
+        // Data inputs for the ALU come from the Register File and the ALU Input Mux
+        Connector.connect(this.registerFile.output1, this.ALU.inputA);
+        Connector.connect(this.ALUInput2Mux.output, this.ALU.inputB);
+        // Control input for the ALU comes from the ALUControl
+        Connector.connect(this.ALUControl.output, this.ALU.operation);
+        // Input for the ALU Input Mux comes from the Register File and the SignExtender
+        Connector.connect(this.registerFile.output2, this.ALUInput2Mux.inputA);
+        Connector.connect(this.signExtender.output, this.ALUInput2Mux.inputB);
+        Connector.connect(this.PCU.aluSRC, this.ALUInput2Mux.control);
+
+        // Address input for the Memory File comes from the ALU output
+        Connector.connect(this.ALU.output1, this.memoryFile.address);
+        // Write data input for the Memory File comes from the Register File (Read Data 2)
+        Connector.connect(this.registerFile.output2, this.memoryFile.writeData);
+        // Control input for the Memory File comes from the PCU
+        Connector.connect(this.PCU.memWrite, this.memoryFile.memWriteControl);
+        Connector.connect(this.PCU.memRead, this.memoryFile.memReadControl);
+
+        // Input for the Register File Write Data Mux comes from the ALU output and the Memory File Read Data
+        Connector.connect(this.ALU.output1, this.regFileWriteDataMux.inputA);
+        Connector.connect(this.memoryFile.output, this.regFileWriteDataMux.inputB);
+        // Control input for the Register File Write Data Mux comes from the MemToReg Control Line
+        Connector.connect(this.PCU.memToReg, this.regFileWriteDataMux.control);
+
+        // Input for the SLL2 comes from the SignExtender
+        Connector.connect(this.signExtender.output, this.SLL2.input);
+
+        // Input for the Branch Adder comes from the PC Adder and the SLL2
+        Connector.connect(this.PCAdder.output, this.branchAdder.input1);
+        Connector.connect(this.SLL2.output, this.branchAdder.input2);
+
+        // Input for the Branch Mux comes from the Branch Adder and the PC Adder
+        Connector.connect(this.branchAdder.output, this.branchMux.inputA);
+        Connector.connect(this.branchAdder.output, this.branchMux.inputB);
+        // Control for the Branch Mux comes from (ALU.Zero and Branch Control Line)
+        const AND = new AndGate(32); // 32 bit AND gate
+        Connector.connect(this.PCU.branch, AND.input1);
+        Connector.connect(this.ALU.output2, AND.input2); // ALU.Zero
+        Connector.connect(AND.output, this.branchMux.control);
+
+        // Input for the PC Adder comes from the PC and the literal (4)
+        Connector.connect(this.PC.output, this.PCAdder.input1);
+        Connector.connect(4, this.PCAdder.input2);
+    }
 
     /**
      * Runs the given program on the chip. The program is a string
@@ -70,9 +156,6 @@ class SingleCycleMIPSChip {
         const assembler = new Assembler(this.memory);
         assembler.assemble(program, 0);
 
-        // The program counter (PC) is initialized to 0
-        this.PC = 0;
-
         // Start the clock cycle
         // this.startClock();
         this.tick();
@@ -85,111 +168,8 @@ class SingleCycleMIPSChip {
 
     // This method is called for each clock cycle
     private tick() {
-        this.fetchInstruction();
-        this.decodeInstruction();
-        this.executeInstruction();
-        this.memoryAccess();
-        this.writeBack();
+        Component.doSingleClockCycle();
     }
-
-    private fetchInstruction() {
-        // Fetch the instruction from memory at the address in the PC
-        const instruction = this.memory.readWord(this.PC);
-
-        // Break out the instruction into its component parts
-        // Opcode, Rs, Rt, Rd, Shamt, Funct, Immediate, Address
-
-        /**
-         * The opcode of the instruction.
-         *
-         * The PCU will use this to determine the type of instruction.
-         *
-         * The opcode is the first 6 bits of the instruction. [31:26]
-         */
-        const opcode = (instruction & BITMASKS.OPCODE) >>> BITMASKS.OPCODE_SHIFT;
-
-        /**
-         * The source register for the instruction.
-         *
-         * The register file will use this to read the value from the register.
-         *
-         * The source register occupies the bits [25:21] of the instruction.
-         */
-        const rs = (instruction & BITMASKS.RS) >>> BITMASKS.RS_SHIFT;
-
-        /**
-         * The target register for the instruction.
-         *
-         * The register file will use this to read the value from the register.
-         *
-         * The target register occupies the bits [20:16] of the instruction.
-         */
-        const rt = (instruction & BITMASKS.RT) >>> BITMASKS.RT_SHIFT;
-
-        /**
-         * The destination register for the instruction.
-         *
-         * The register file will use this to write the value to the register.
-         *
-         * The destination register occupies the bits [15:11] of the instruction.
-         */
-        const rd = (instruction & BITMASKS.RD) >>> BITMASKS.RD_SHIFT;
-
-        /**
-         * The shift amount for the instruction.
-         *
-         * The ALU will use this to perform shift operations.
-         *
-         * The shift amount occupies the bits [10:6] of the instruction.
-         */
-        const shamt = (instruction & BITMASKS.SHAMT) >>> BITMASKS.SHAMT_SHIFT;
-
-        /**
-         * The function code for the instruction.
-         *
-         * The ALU will use this to determine the operation to perform.
-         *
-         * The function code occupies the bits [5:0] of the instruction.
-         */
-        const funct = (instruction & BITMASKS.FUNCT) >>> BITMASKS.FUNCT_SHIFT;
-
-        /**
-         * The immediate value for the instruction.
-         *
-         * The sign extender will use this to extend the immediate value to 32 bits.
-         *
-         * The immediate value occupies the bits [15:0] of the instruction.
-         */
-        const immediate = (instruction & BITMASKS.IMMEDIATE) >>> BITMASKS.IMMEDIATE_SHIFT;
-
-        /**
-         * The address for the instruction.
-         *
-         * The jump unit will use this to set the PC to the new address.
-         *
-         * The address occupies the bits [25:0] of the instruction.
-         */
-        const address = (instruction & BITMASKS.ADDRESS) >>> BITMASKS.ADDRESS_SHIFT;
-
-        // Pass the components to the next stage of the pipeline
-        this.PCU.setOpcode(opcode);
-        this.registerFile.readRegister1 = rs;
-        this.writeRegisterMUX.setInputs(rt, rd);
-        this.signExtender.setInput(immediate);
-        this.ALUControl.setFunctionCode(funct);
-    }
-
-    private decodeInstruction() {}
-
-    private executeInstruction() {}
-
-    private memoryAccess() {}
-
-    private writeBack() {}
 }
 
 export default SingleCycleMIPSChip;
-
-function numberToBitString(n: number, length: number): number[] {
-    return _.padStart(n.toString(2), length, '0').split('').map(Number);
-}

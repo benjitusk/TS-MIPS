@@ -1,31 +1,20 @@
-export class ALUControl {
-    // The alu control has the following inputs:
-    // 1. The ALUOp (2-bit) from the control unit
-    // 2. The function code (6-bit) from the instruction
+import { Connector, SingleOutputComponent } from '../hardware';
 
-    /**
-     * The input at ALUOp.
-     */
-    private aluOp: number = 0;
+/**
+ * The ALU control determines the operation that will be performed
+ * by the ALU, based on the function code input and the ALUOp control line.
+ *
+ * The function code is a 4-bit number. See {@link https://www.cs.ucr.edu/~windhs/lab4/lab4.html|this website}
+ * for more information on the inputs and outputs of this component.
+ */
+export class ALUControl extends SingleOutputComponent<4> {
+    public readonly functInput = new Connector(6);
+    public readonly ALUOpControl = new Connector(2);
 
-    /**
-     * The input at Function Code.
-     */
-    private funct: number = 0;
-
-    /**
-     * Set the ALUOp input to the ALU Control.
-     */
-    public setALUOp(aluOp: number) {
-        // The ALUOp is the 2 least significant bits of the opcode
-        this.aluOp = aluOp & 0x3;
+    constructor() {
+        super(4);
     }
-
-    /**
-     * Set the Function Code input to the ALU Control.
-     */
-    public setFunctionCode(funct: number) {
-        // The function code is the 6 least significant bits of the instruction
-        this.funct = funct & 0x3f;
+    protected _update(): void {
+        throw new Error('Method not implemented.');
     }
 }

@@ -49,8 +49,6 @@ export abstract class SingleOutputComponent<const TSize extends number> extends 
     }
 
     protected update(): boolean {
-        // @ts-ignore
-        // console.log(`Updating ${this.constructor.name}, input: ${this.input?.getValue()}, input1: ${this.input1?.getValue()}, input2: ${this.input2?.getValue()}`);
         const oldValue = this.output.getValue();
         this._update();
         console.log(`Updated ${this.constructor.name}, before: ${oldValue}, after: ${this.output.getValue()}`);
