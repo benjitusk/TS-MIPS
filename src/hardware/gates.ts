@@ -2,8 +2,8 @@ import { SingleOutputComponent } from './componentBase';
 import { Connector } from './connector';
 
 export class AndGate<const TSize extends number> extends SingleOutputComponent<TSize> {
-    input1: Connector<TSize>;
-    input2: Connector<TSize>;
+    public readonly input1: Connector<TSize>;
+    public readonly input2: Connector<TSize>;
 
     constructor(size: TSize) {
         super(size);
@@ -11,14 +11,14 @@ export class AndGate<const TSize extends number> extends SingleOutputComponent<T
         this.input2 = new Connector(size);
     }
 
-    _update() {
+    protected _update() {
         this.output.setValue(this.input1.getValue() & this.input2.getValue());
     }
 }
 
 export class OrGate<const TSize extends number> extends SingleOutputComponent<TSize> {
-    input1: Connector<TSize>;
-    input2: Connector<TSize>;
+    public readonly input1: Connector<TSize>;
+    public readonly input2: Connector<TSize>;
 
     constructor(size: TSize) {
         super(size);
@@ -26,20 +26,20 @@ export class OrGate<const TSize extends number> extends SingleOutputComponent<TS
         this.input2 = new Connector(size);
     }
 
-    _update() {
+    protected _update() {
         this.output.setValue(this.input1.getValue() | this.input2.getValue());
     }
 }
 
 export class NotGate<const TSize extends number> extends SingleOutputComponent<TSize> {
-    input: Connector<TSize>;
+    public readonly input: Connector<TSize>;
 
     constructor(size: TSize) {
         super(size);
         this.input = new Connector(size);
     }
 
-    _update() {
+    protected _update() {
         this.output.setValue(~this.input.getValue());
     }
 }
@@ -53,14 +53,14 @@ export class ZeroExtender<
     const TSizeIn extends number,
     const TSizeOut extends number
 > extends SingleOutputComponent<TSizeOut> {
-    input: Connector<TSizeIn>;
+    public readonly input: Connector<TSizeIn>;
 
     constructor(sizeIn: TSizeIn, sizeOut: TSizeOut) {
         super(sizeOut);
         this.input = new Connector(sizeIn);
     }
 
-    _update() {
+    protected _update() {
         this.output.setValue(this.input.getValue());
     }
 }
